@@ -92,19 +92,45 @@ test("get started opens sign-up, validates password confirmation, and switches t
   await expect(dialog.getByRole("alert")).toHaveText("Enter your valid email address above first.");
 });
 
+test("hero demo link and login, signup, and footer actions reach their working destinations", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "See it in action" }).click();
+  await expect(page).toHaveURL(/#demo$/);
+  await expect(page.locator("#demo")).toBeInViewport();
+
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Welcome back to your khata." })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  const footer = page.locator(".site-footer");
+  await footer.getByRole("button", { name: "Get started", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "A fresh start for your shop." })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await footer.getByRole("button", { name: "Owner login", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Welcome back to your khata." })).toBeVisible();
+});
+
 test("mobile and tablet landing navigation have no horizontal overflow", async ({ page }) => {
-  for (const width of [320, 390, 768]) {
+  for (const width of [1440, 1280, 768, 390, 360, 320]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
-    await page.getByRole("button", { name: "Open menu" }).click();
-    const nav = page.getByRole("navigation", { name: "Mobile website navigation" });
-    await nav.getByRole("link", { name: "Features", exact: true }).click();
-    await expect(nav).not.toBeVisible();
-    await expect(page.locator("#features")).toBeInViewport();
+    if (width <= 820) {
+      await page.getByRole("button", { name: "Open menu" }).click();
+      const nav = page.getByRole("navigation", { name: "Mobile website navigation" });
+      await nav.getByRole("link", { name: "Features", exact: true }).click();
+      await expect(nav).not.toBeVisible();
+      await expect(page.locator("#features")).toBeInViewport();
+      await page.getByRole("button", { name: "Open menu" }).click();
+      await nav.getByRole("button", { name: "Get started", exact: true }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
   }
 });
 

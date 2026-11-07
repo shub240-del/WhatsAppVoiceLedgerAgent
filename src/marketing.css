@@ -1981,6 +1981,19 @@
     color: #67844e;
     font-size: 14px;
   }
+  .site-mobile-nav > .site-mobile-start {
+    justify-content: center;
+    gap: 12px;
+    min-height: 46px;
+    margin-top: 10px;
+    padding: 12px 18px;
+    border-radius: 6px;
+    color: #fff;
+    background: #2a563e;
+  }
+  .site-mobile-nav > .site-mobile-start:hover {
+    background: #1c422f;
+  }
   .site-hero {
     grid-template-columns: 1fr 1fr;
     padding-block: 55px;

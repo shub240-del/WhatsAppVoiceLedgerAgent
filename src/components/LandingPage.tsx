@@ -50,6 +50,10 @@ const faqs = [
     "Choose Get started to create your owner account. During the pilot, an onboarding administrator securely provisions and links your shop. The setup guide gives you your owner ID and lets you check when access is ready.",
   ],
   [
+    "How are my customers and their balances organized?",
+    "Keep each customer’s name, optional familiar landmark or alias, current balance, and ledger history together in your shop workspace.",
+  ],
+  [
     "What happens if I enter the wrong amount?",
     "You can reverse an entry with a reason, or correct it by creating a linked reversal and replacement. The original stays visible, so you have a clear record of what changed and why.",
   ],
@@ -462,6 +466,16 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
               </a>
             ))}
             <button
+              className="site-mobile-start"
+              onClick={() => {
+                setMenu(false);
+                onStart();
+              }}
+            >
+              Get started
+              <ArrowRight size={16} />
+            </button>
+            <button
               onClick={() => {
                 setMenu(false);
                 onLogin();
@@ -555,24 +569,24 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
             {[
               {
                 n: "01",
-                title: "Make it your khata.",
-                copy: "Create your owner account and securely link your shop with your onboarding administrator.",
-                icon: Store,
-                foot: "A private start",
+                title: "Speak naturally.",
+                copy: "Say the customer’s name, amount, and whether it is credit or a payment. Voice is part of the connected pilot and requires setup.",
+                icon: Mic,
+                foot: "Your everyday words",
               },
               {
                 n: "02",
-                title: "Say it. Or simply add it.",
-                copy: "Record credit and payments in the dashboard. Voice notes are designed for the connected WhatsApp pilot.",
-                icon: Mic,
-                foot: "Made for your everyday words",
+                title: "AI understands your entry.",
+                copy: "The workflow checks the customer, amount, and action. Unclear details should be reviewed, not guessed.",
+                icon: AudioLines,
+                foot: "Review before it counts",
               },
               {
                 n: "03",
-                title: "Know where you stand.",
-                copy: "See balances, review every entry, and correct mistakes without losing the original record.",
+                title: "Your khata updates after validation.",
+                copy: "Once confirmed, the entry updates the ledger. Review the history later and correct mistakes with a reason.",
                 icon: BookOpen,
-                foot: "A clearer close to the day",
+                foot: "A clear record, kept together",
               },
             ].map((step) => (
               <article key={step.n}>
@@ -859,17 +873,15 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
           </div>
           <span className="site-kicker">A CLEARER KHATA. A LIGHTER DAY.</span>
           <h2>
-            Keep the trust.
+            Your dukaan deserves
             <br />
-            <em>Lose the paperwork.</em>
+            <em>a simpler khata.</em>
           </h2>
           <p>
-            Your shop has enough to do.
-            <br />
-            Let’s make the hisaab a little simpler.
+            Keep the trust. Make the everyday hisaab a little simpler.
           </p>
           <button className="site-button site-button-light" onClick={onStart}>
-            Get started with Udhaar
+            Get started
             <ArrowRight size={17} />
           </button>
           <small>Owner dashboard · Guided pilot onboarding</small>

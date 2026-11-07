@@ -1,0 +1,23 @@
+import { getApp, getApps, initializeApp } from "firebase/app";
+import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+
+// Firebase web configuration is public; access is enforced by rules and verified ID tokens.
+const config = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD-LNFDk4SWg8Qpuy0YDvv5GooiwBH6PmA",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "udhar-khata-f41fb.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "udhar-khata-f41fb",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:224661631158:web:31071e4838506c10bdf617",
+};
+
+export const firebaseApp = getApps().length ? getApp() : initializeApp(config);
+export const auth = getAuth(firebaseApp);
+export const db = getFirestore(firebaseApp);
+export const projectId = config.projectId;
+
+if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true") {
+  connectAuthEmulator(auth, "http://127.0.0.1:9099");
+  connectFirestoreEmulator(db, "127.0.0.1", 8181);
+}
+
+// Analytics is deliberately not initialized: it is unnecessary for private financial records.

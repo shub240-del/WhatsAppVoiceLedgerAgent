@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ownerOf(shopId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/owners/$(request.auth.uid))
+        && get(/databases/$(database)/documents/owners/$(request.auth.uid)).data.active == true
+        && get(/databases/$(database)/documents/owners/$(request.auth.uid)).data.role == 'owner'
+        && get(/databases/$(database)/documents/owners/$(request.auth.uid)).data.shopId == shopId
+        && get(/databases/$(database)/documents/shops/$(shopId)).data.active == true;
+    }
+    match /owners/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+    match /shops/{shopId} {
+      allow get: if ownerOf(shopId);
+      allow list, write: if false;
+      match /{collection}/{documentId} {
+        allow read: if ownerOf(shopId)
+          && collection in ['customers', 'ledgerEntries', 'auditLogs', 'reminderPreferences', 'reversals',
+                         'entryRevisions', 'reminderJobs', 'reminderLogs', 'paymentLinks', 'pendingClarifications'];
+        // Financial and membership mutations are only available through the verified Admin API.
+        allow write: if false;
+      }
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

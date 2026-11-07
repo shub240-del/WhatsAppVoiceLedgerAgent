@@ -1,0 +1,10 @@
+{
+  "description": "Helps kirana shop owners record customer credit and payments by WhatsApp voice, check balances, undo mistakes, and review an auditable ledger.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

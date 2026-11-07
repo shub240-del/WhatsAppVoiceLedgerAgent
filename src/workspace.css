@@ -1,0 +1,588 @@
+/* Workspace refinement. Existing financial components and Firebase data paths are unchanged. */
+.app-shell {
+  --workspace-text: #53664e;
+  --workspace-muted: #73816a;
+}
+.app-shell .sidebar {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #d8e1cf transparent;
+}
+.app-shell .page-content {
+  padding-top: 37px;
+}
+.app-shell .workspace-label {
+  font-size: 10px;
+  color: #7b8a71;
+}
+.app-shell .nav-item {
+  font-size: 13px;
+  color: #73816a;
+  min-height: 43px;
+}
+.app-shell .nav-item.active {
+  color: #315f3d;
+  background: #eaf1e4;
+}
+.app-shell .shop-switch > span:nth-child(2) {
+  font-size: 13px;
+}
+.app-shell .shop-switch small {
+  color: #7e8e73;
+  font-size: 10px;
+}
+.app-shell .trust-note p {
+  color: #7e8e70;
+  font-size: 11px;
+}
+.app-shell .trust-note strong {
+  font-size: 12px;
+}
+.app-shell .trust-note button {
+  font-size: 11px;
+}
+.app-shell .profile small {
+  font-size: 10px;
+  color: #7f8c74;
+}
+.app-shell .profile > span {
+  font-size: 12px;
+}
+.app-shell .breadcrumb {
+  font-size: 12px;
+}
+.app-shell .private-label {
+  font-size: 11px;
+  color: #7f8c74;
+}
+.app-shell .page-heading .eyebrow {
+  color: #7b9069;
+  font-size: 9px;
+}
+.app-shell .page-heading p {
+  color: #7d8a72;
+  font-size: 12px;
+}
+.app-shell .button {
+  min-height: 41px;
+  font-size: 12px;
+  gap: 8px;
+}
+.app-shell .button.small {
+  min-height: 34px;
+  font-size: 11px;
+}
+.app-shell .icon-btn {
+  min-height: 34px;
+  min-width: 34px;
+}
+.app-shell .text-button {
+  font-size: 11px;
+  min-height: 28px;
+}
+.app-shell .stat-card {
+  padding: 23px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px #263d3603;
+}
+.app-shell .stat-top > span:first-child {
+  font-size: 12px;
+  color: #77886a;
+}
+.app-shell .stat-icon {
+  width: 35px;
+  height: 35px;
+}
+.app-shell .stat-value {
+  font-size: 34px;
+  color: #3d5630;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+.app-shell .stat-note {
+  font-size: 10px;
+  color: #879978;
+}
+.app-shell .panel-heading h2 {
+  font-size: 14px;
+  color: #47633b;
+}
+.app-shell .panel-heading p {
+  font-size: 11px;
+  color: #8a9a7b;
+  line-height: 1.7;
+}
+.app-shell .panel-heading {
+  padding: 23px 24px 19px;
+}
+.app-shell .setup-step strong {
+  font-size: 11px;
+  color: #6c815b;
+}
+.app-shell .setup-step small {
+  font-size: 9px;
+  color: #8b9a7c;
+  line-height: 1.7;
+}
+.app-shell .setup-step {
+  padding-block: 13px;
+}
+.app-shell .setup-step.done strong {
+  color: #879b76;
+}
+.app-shell .setup-count {
+  font-size: 12px;
+}
+.app-shell .voice-card {
+  min-height: 310px;
+}
+.app-shell .voice-copy > p {
+  color: #73885d;
+  font-size: 12px;
+}
+.app-shell .voice-copy .button {
+  font-size: 10px;
+  min-height: 39px;
+  gap: 6px;
+}
+.app-shell .voice-disclaimer {
+  color: #7b8e66;
+  font-size: 8px;
+}
+.app-shell .empty-state {
+  min-height: 245px;
+}
+.app-shell .empty-state h3 {
+  font-size: 14px;
+  color: #627b4f;
+}
+.app-shell .empty-state p {
+  font-size: 11px;
+  color: #879978;
+}
+.app-shell .panel-footer {
+  font-size: 9px;
+  color: #879978;
+}
+.app-shell .activity-row strong {
+  font-size: 12px;
+}
+.app-shell .activity-row small {
+  font-size: 10px;
+  color: #8a9d79;
+  line-height: 1.7;
+}
+.app-shell .activity-icon {
+  width: 36px;
+  height: 36px;
+}
+.app-shell .activity-amount {
+  font-size: 14px;
+}
+.app-shell .reminder-card h3 {
+  font-size: 19px;
+  color: #78764e;
+}
+.app-shell .reminder-card p {
+  font-size: 11px;
+  color: #999673;
+}
+.app-shell .reminder-card .text-button {
+  font-size: 10px;
+}
+.app-shell .assurance span {
+  font-size: 9px;
+}
+.app-shell .connection-banner strong,
+.app-shell .connection-banner span,
+.app-shell .connection-banner button {
+  font-size: 11px;
+}
+.app-shell .table-toolbar {
+  padding: 19px 21px;
+}
+.app-shell .search-field input {
+  font-size: 12px;
+}
+.app-shell .search-field {
+  padding-block: 10px;
+  max-width: 395px;
+}
+.app-shell .table-toolbar select {
+  font-size: 11px;
+  min-height: 37px;
+}
+.app-shell th {
+  font-size: 11px;
+  color: #859975;
+  padding: 14px 21px;
+}
+.app-shell td {
+  font-size: 12px;
+  padding: 20px 21px;
+  color: #799465;
+}
+.app-shell td strong {
+  color: #4c6c39;
+}
+.app-shell .amount-cell {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.app-shell .table-small {
+  font-size: 9px;
+  color: #8ca178;
+}
+.app-shell .table-avatar {
+  height: 34px;
+  width: 34px;
+}
+.app-shell .entry-tag {
+  font-size: 9px;
+  padding: 5px 8px;
+}
+.app-shell .table-bottom > span {
+  color: #8da17b;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.app-shell .table-bottom {
+  padding: 16px 21px;
+}
+.app-shell .subtle {
+  color: #91a57c;
+}
+.app-shell .section-heading p {
+  color: #879b75;
+  font-size: 12px;
+}
+.app-shell .adapter-card h3 {
+  font-size: 16px;
+}
+.app-shell .adapter-card p {
+  color: #839c6d;
+  font-size: 12px;
+  line-height: 1.7;
+  margin-bottom: 19px;
+}
+.app-shell .adapter-status {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.app-shell .adapter-detail {
+  font-size: 10px;
+  color: #8e9f7e;
+}
+.app-shell .connection-details small {
+  font-size: 9px;
+}
+.app-shell .connection-details strong {
+  font-size: 12px;
+  color: #66824f;
+}
+.app-shell .connection-foot > span {
+  font-size: 11px;
+}
+.app-shell .settings-card > p {
+  color: #8b9e79;
+  font-size: 11px;
+}
+.app-shell .settings-card dl > div {
+  font-size: 12px;
+}
+.app-shell .settings-card dt {
+  color: #8da078;
+}
+.app-shell .safety-row {
+  font-size: 11px;
+}
+.app-shell .setup-hint {
+  font-size: 11px;
+}
+.app-shell .policy-note h3 {
+  font-size: 14px;
+}
+.app-shell .policy-note p {
+  font-size: 11px;
+}
+.app-shell .error-banner {
+  font-size: 12px;
+}
+.app-shell .page-footer {
+  font-size: 9px;
+}
+.modal .form > label,
+.modal .form-columns > label {
+  font-size: 12px;
+  color: #6c815b;
+}
+.modal .form input:not([type="checkbox"]),
+.modal .form select,
+.modal .form textarea {
+  min-height: 44px;
+  font-size: 13px;
+}
+.modal .form textarea {
+  min-height: 80px;
+}
+.modal .form-note {
+  font-size: 11px;
+  color: #83986e;
+}
+.modal .form-error {
+  font-size: 12px;
+  color: #925338;
+}
+.modal .modal-description {
+  color: #7a9064;
+}
+.modal .button {
+  min-height: 43px;
+  font-size: 12px;
+}
+.modal .advanced {
+  font-size: 11px;
+}
+.modal .checkbox-label {
+  font-size: 11px;
+  color: #819767;
+}
+.modal .history-list small {
+  font-size: 10px;
+  color: #89a16f;
+}
+.modal .history-list strong {
+  font-size: 12px;
+}
+.workspace-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.workspace-home {
+  font-size: 11px;
+  color: #8e9f7f;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 0;
+  margin-bottom: 10px;
+}
+.workspace-home:hover {
+  color: #4d7036;
+}
+.onboarding-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 23px;
+  border: 1px solid #dce7d1;
+  border-radius: 9px;
+  background: #f0f6e8;
+  margin-bottom: 25px;
+}
+.onboarding-banner > div {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.onboarding-banner > div > span {
+  color: #91a976;
+  background: #e5eedb;
+  display: grid;
+  place-items: center;
+  height: 37px;
+  width: 37px;
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+.onboarding-banner strong {
+  font-size: 13px;
+  color: #5c7b43;
+  font-weight: 600;
+}
+.onboarding-banner p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #8da178;
+  margin-top: 4px;
+}
+.onboarding-banner .button {
+  flex-shrink: 0;
+}
+.app-shell .page-loading {
+  margin: 20px 0 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #8a9f74;
+  font-size: 12px;
+}
+.app-shell .readonly-notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: #9a906b;
+  padding: 12px 16px;
+  background: #f7f3e7;
+  border: 1px solid #eee4ce;
+  border-radius: 7px;
+  margin-bottom: 20px;
+  line-height: 1.8;
+}
+@media (max-width: 1190px) {
+  .app-shell .stat-card {
+    padding: 19px;
+  }
+  .app-shell .stat-top > span:first-child {
+    font-size: 11px;
+  }
+  .app-shell .stat-note {
+    font-size: 9px;
+  }
+  .app-shell .voice-copy > p {
+    font-size: 11px;
+  }
+  .app-shell .voice-copy .button {
+    font-size: 9px;
+  }
+}
+@media (max-width: 990px) {
+  .app-shell .stat-card {
+    padding: 15px;
+  }
+  .app-shell .stat-top > span:first-child {
+    font-size: 10px;
+  }
+  .app-shell .stat-note {
+    font-size: 8px;
+  }
+  .app-shell .private-label {
+    font-size: 10px;
+  }
+}
+@media (max-width: 760px) {
+  .app-shell .sidebar {
+    padding-top: 25px;
+  }
+  .app-shell .sidebar-bottom {
+    padding-top: 12px;
+  }
+  .app-shell .trust-note {
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .app-shell .trust-note p {
+    font-size: 10px;
+  }
+  .app-shell .nav-item {
+    min-height: 42px;
+  }
+  .app-shell .page-heading p {
+    font-size: 11px;
+  }
+  .app-shell .voice-copy > p {
+    font-size: 11px;
+  }
+  .app-shell .voice-copy .button {
+    font-size: 10px;
+  }
+  .app-shell .setup-step strong {
+    font-size: 12px;
+  }
+  .app-shell .setup-step small {
+    font-size: 10px;
+  }
+  .workspace-home {
+    display: none;
+  }
+}
+@media (max-width: 500px) {
+  .app-shell .page-content {
+    padding-top: 25px;
+  }
+  .app-shell .page-heading .eyebrow {
+    font-size: 7px;
+  }
+  .app-shell .heading-actions .button {
+    min-height: 36px;
+    font-size: 10px;
+    padding-inline: 9px;
+  }
+  .app-shell .private-label {
+    font-size: 0;
+  }
+  .app-shell .stat-top > span:first-child {
+    font-size: 10px;
+  }
+  .app-shell .stat-value {
+    font-size: 29px;
+  }
+  .app-shell .stat-note {
+    font-size: 8px;
+  }
+  .app-shell .voice-card {
+    min-height: 310px;
+  }
+  .app-shell .voice-copy > p {
+    font-size: 10px;
+  }
+  .app-shell .voice-copy .button {
+    font-size: 8px;
+  }
+  .app-shell .voice-disclaimer {
+    font-size: 7px;
+  }
+  .app-shell .panel-heading {
+    padding: 19px 16px 15px;
+  }
+  .app-shell .panel-heading p {
+    font-size: 9px;
+  }
+  .app-shell .panel-heading h2 {
+    font-size: 13px;
+  }
+  .app-shell .panel-heading .text-button {
+    font-size: 9px;
+  }
+  .app-shell .connection-banner strong,
+  .app-shell .connection-banner span,
+  .app-shell .connection-banner button {
+    font-size: 10px;
+  }
+  .app-shell .table-toolbar {
+    padding: 13px;
+  }
+  .app-shell .table-bottom > span {
+    font-size: 9px;
+  }
+  .app-shell .error-banner {
+    font-size: 11px;
+  }
+  .app-shell .page-footer {
+    font-size: 8px;
+  }
+  .onboarding-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 18px;
+  }
+  .onboarding-banner .button {
+    align-self: flex-start;
+    margin-left: 50px;
+  }
+  .onboarding-banner p {
+    font-size: 10px;
+  }
+  .app-shell .readonly-notice {
+    font-size: 9px;
+    align-items: flex-start;
+  }
+  .app-shell .readonly-notice > svg {
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+}

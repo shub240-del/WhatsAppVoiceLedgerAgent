@@ -3,10 +3,12 @@
  * type or speak real sentences. Reply wording mirrors server/agent/messages.ts exactly.
  * Nothing here touches the server or anyone's real data.
  */
-export type DemoCustomer = { name: string; paise: number };
+export type ReminderLang = "hi" | "mr" | "gu";
+export type DemoCustomer = { name: string; paise: number; lang: ReminderLang; native: string };
 export type DemoEntry = { id: number; name: string; paise: number; reversed: boolean };
 type Pending =
   | { kind: "new"; name: string; paise: number; notes: string }
+  | { kind: "amount"; name: string; notes: string }
   | { kind: "advance"; name: string; paise: number };
 export type DemoState = {
   customers: DemoCustomer[];
@@ -23,9 +25,9 @@ const rupees = (paise: number) => `₹${(Math.abs(paise) / 100).toLocaleString("
 export function demoStart(): DemoState {
   return {
     customers: [
-      { name: "Ramesh", paise: 90000 },
-      { name: "Sunita", paise: 65000 },
-      { name: "Priya", paise: 12000 },
+      { name: "Ramesh", paise: 90000, lang: "hi", native: "रमेश" },
+      { name: "Sunita", paise: 65000, lang: "mr", native: "सुनीता" },
+      { name: "Priya", paise: 12000, lang: "gu", native: "પ્રિયા" },
     ],
     entries: [
       { id: 1, name: "Ramesh", paise: 90000, reversed: false },
@@ -47,8 +49,9 @@ const AMOUNT = String.raw`(?:₹\s*)?(\d[\d,]*)\s*(?:rupaye|rupay|rupees|rs\.?|�
 const CREDIT = new RegExp(String.raw`^([\p{L}]+(?:\s+[\p{L}]+)?)\s+(?:ko|ka|ke|ki)\s+${AMOUNT}\s*(?:ka|ki|ke)?\s*(?:udhaar|udhar|credit)\b(.*)$`, "u");
 const PAYMENT = new RegExp(String.raw`^([\p{L}]+(?:\s+[\p{L}]+)?)\s+(?:ne|se)\s+${AMOUNT}\s*(?:diye|diya|de diye|de gaye|mile|mila|jama|wapas|chukaye)\b`, "u");
 const BALANCE = /^([\p{L}]+(?:\s+[\p{L}]+)?)\s+(?:ka|ki|ke)\s+(?:kitna|kitne|kitni)?\s*(?:baaki|baki|udhaar|udhar|hisaab|hisab)\b/u;
-const COUNTS = /^(ek|do|teen|char|chaar|paanch|panch|aadha|\d+(?:\.\d+)?\s*(?:kg|g|l|litre|packet|pkt)?)\s+/i;
+const NUMBER_WORDS: Record<string, string> = { ek: "1", do: "2", teen: "3", char: "4", chaar: "4", paanch: "5", panch: "5", aadha: "½" };
 
+const BOUGHT = /^([\p{L}]+(?:\s+[\p{L}]+)?)\s+ne\s+(.+?)\s+(?:liya|liye|li|le gaye|le gayi|le gaya)\b[\s,]*(?:(?:udhaar|udhar)\s*(?:mein|me|pe|par)?)?\s*$/u;
 const clean = (s: string) => s.toLowerCase().replace(/[.!?।]+$/u, "").replace(/\s+/g, " ").trim();
 const title = (s: string) => s.replace(/\p{L}+/gu, (w) => w[0].toUpperCase() + w.slice(1));
 const toPaise = (digits: string) => Math.round(Number(digits.replace(/,/g, "")) * 100);
@@ -62,7 +65,7 @@ function itemsFrom(tail: string) {
   if (!text) return "";
   return text
     .split(/\s*(?:,|\baur\b|&)\s*/)
-    .map((i) => i.trim().replace(COUNTS, ""))
+    .map((i) => i.trim().replace(/^(\p{L}+)(?=\s)/u, (w) => NUMBER_WORDS[w.toLowerCase()] ?? w))
     .filter(Boolean)
     .join(", ");
 }
@@ -74,7 +77,7 @@ function withBalance(state: DemoState, name: string, delta: number): DemoState {
   const exists = find(state, name);
   const customers = exists
     ? state.customers.map((c) => (c === exists ? { ...c, paise: c.paise + delta } : c))
-    : [...state.customers, { name, paise: delta }];
+    : [...state.customers, { name, paise: delta, lang: "hi" as const, native: name }];
   return {
     ...state,
     customers,
@@ -98,7 +101,7 @@ export function demoReply(state: DemoState, input: string): DemoTurn {
   // Answers to an open question.
   if (state.pending) {
     const p = state.pending;
-    if (YES.test(text)) {
+    if (p.kind !== "amount" && YES.test(text)) {
       if (p.kind === "new") {
         const next = withBalance({ ...state, pending: null }, p.name, p.paise);
         const bal = find(next, p.name)!.paise;
@@ -110,6 +113,13 @@ export function demoReply(state: DemoState, input: string): DemoTurn {
       return turn(next, `${p.name}: ${rupees(p.paise)} mile. Total baaki: ${bal < 0 ? "−" : ""}${rupees(bal)}. ${HINT}`, "payment", p.name);
     }
     if (NO.test(text)) return turn({ ...state, pending: null }, "Theek hai, kuch save nahi kiya.");
+    const amount = text.match(/^(?:₹\s*)?(\d[\d,]*)\s*(?:rupaye|rupay|rs\.?|₹)?$/);
+    if (p.kind === "amount" && amount) {
+      const paise = toPaise(amount[1]);
+      const next = withBalance({ ...state, pending: null }, p.name, paise);
+      const bal = find(next, p.name)!.paise;
+      return turn(next, `${p.name}: +${rupees(paise)}${p.notes ? ` (${p.notes})` : ""}. Total baaki: ${rupees(bal)}. ${HINT}`, "credit", p.name);
+    }
   }
 
   if (/^(madad|help|menu|hi|hello|namaste|start)$/.test(text)) return turn(state, DEMO_HELP);
@@ -151,6 +161,17 @@ export function demoReply(state: DemoState, input: string): DemoTurn {
     return turn(next, `${known.name}: +${rupees(paise)}${notes ? ` (${notes})` : ""}. Total baaki: ${rupees(bal)}. ${HINT}`, "credit", known.name);
   }
 
+  m = text.match(BOUGHT);
+  if (m) {
+    const known = find(state, title(m[1]));
+    const original = input.replace(/[.!?।]+$/u, "").replace(/\s+/g, " ").trim();
+    const start = original.toLowerCase().indexOf(m[2]);
+    const notes = itemsFrom(start >= 0 ? original.slice(start, start + m[2].length) : m[2]);
+    if (!known) return turn(state, "Kaun sa customer? Naam saaf bolein, jaise 'Ramesh ko 340 ka udhaar'.");
+    // Goods without a price: never guess the amount, ask.
+    return turn({ ...state, pending: { kind: "amount", name: known.name, notes } }, "Kitne rupaye likhne hain?", null, null, []);
+  }
+
   m = text.match(PAYMENT);
   if (m) {
     const name = title(m[1]);
@@ -188,4 +209,32 @@ export function demoReply(state: DemoState, input: string): DemoTurn {
   }
 
   return turn(state, "Samajh nahi aaya, kuch save nahi hua. Aise bolein: 'Ramesh ko 500 ka udhaar likh do'.");
+}
+
+/** The Sunday reminder a customer receives, in their own language. Amount comes from the khata. */
+export function demoReminder(c: DemoCustomer, shop = { name: "Sharma Kirana", hi: "शर्मा किराना", mr: "शर्मा किराणा", gu: "શર્મા કિરાણા" }) {
+  const amount = (c.paise / 100).toLocaleString("en-IN");
+  switch (c.lang) {
+    case "mr":
+      return {
+        lang: "mr-IN",
+        label: "मराठी",
+        text: `नमस्कार ${c.native}, ${shop.mr} कडून आठवण: तुमचे ₹${amount} बाकी आहेत. खालील UPI लिंकने पैसे भरू शकता. धन्यवाद!`,
+        speech: `नमस्कार ${c.native}, ${shop.mr} कडून आठवण. तुमचे ${amount} रुपये बाकी आहेत. खालील लिंकने पैसे भरू शकता. धन्यवाद!`,
+      };
+    case "gu":
+      return {
+        lang: "gu-IN",
+        label: "ગુજરાતી",
+        text: `નમસ્તે ${c.native}, ${shop.gu} તરફથી યાદ: તમારા ₹${amount} બાકી છે. નીચેની UPI લિંકથી ચૂકવી શકો છો. આભાર!`,
+        speech: `નમસ્તે ${c.native}, ${shop.gu} તરફથી યાદ. તમારા ${amount} રૂપિયા બાકી છે. નીચેની લિંકથી ચૂકવી શકો છો. આભાર!`,
+      };
+    default:
+      return {
+        lang: "hi-IN",
+        label: "हिंदी",
+        text: `नमस्ते ${c.native} जी, ${shop.hi} से याद दिलाना था: आपका ₹${amount} बाकी है। नीचे दिए UPI लिंक से चुका सकते हैं। धन्यवाद!`,
+        speech: `नमस्ते ${c.native} जी, ${shop.hi} से याद दिलाना था। आपका ${amount} रुपये बाकी है। नीचे दिए लिंक से चुका सकते हैं। धन्यवाद!`,
+      };
+  }
 }

@@ -82,40 +82,51 @@ test("public page has local assets, a keyboard skip link and desktop/mobile scre
   expect(failures).toEqual([]);
 });
 
-test("Demo opens a WhatsApp-style chat that answers like the real assistant and updates a live khata", async ({ page }) => {
+test("Demo tells the whole story: three spoken entries, a live khata, and a Sunday reminder with a UPI link", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.getByRole("banner").getByRole("link", { name: "Demo" }).click();
   await expect(page).toHaveURL(/#\/demo$/);
-  const chat = page.getByRole("region", { name: /WhatsApp chat with the Udhaar bot/ });
-  await expect(chat.getByText("Udhaar Khata", { exact: true })).toBeVisible();
-  await expect(chat.getByText("Namaste! Main aapka Udhaar khata hoon.", { exact: false })).toBeVisible();
+  const phone = page.locator(".wd-phone");
+  const suggest = phone.getByRole("group", { name: "Suggested messages" });
   const khata = page.getByRole("region", { name: "The khata, live" });
+  await expect(phone.getByText("Namaste! Main aapka Udhaar khata hoon.", { exact: false })).toBeVisible();
 
-  // Typing works like WhatsApp: the reply is the assistant's exact wording and the khata changes.
-  await chat.getByLabel("Type a message").fill("Ramesh ko 340 ka udhaar, do Maggi aur doodh");
-  await chat.getByRole("button", { name: "Send" }).click();
-  await expect(chat.getByText("Ramesh: +₹340 (Maggi, doodh). Total baaki: ₹1,240.", { exact: false })).toBeVisible();
-  await expect(khata.getByText("₹1,240")).toBeVisible();
+  // 1. Goods without a price: it asks the amount instead of guessing.
+  await suggest.getByRole("button", { name: /Ramesh ne do kilo chawal/ }).click();
+  await expect(phone.getByText("Kitne rupaye likhne hain?")).toBeVisible({ timeout: 8000 });
+  await suggest.getByRole("button", { name: "₹230" }).click();
+  await expect(phone.getByText("Ramesh: +₹230 (2 kilo chawal, 1 Surf). Total baaki: ₹1,130.", { exact: false })).toBeVisible({ timeout: 8000 });
+  await expect(khata.getByText("₹1,130")).toBeVisible();
+  // 2 and 3: typing works too.
+  for (const [line, reply] of [["Sunita ne 200 diye", "Total baaki: ₹450."], ["Priya ko 150 ka udhaar, doodh aur bread", "Total baaki: ₹270."]]) {
+    await phone.getByLabel("Type a message").fill(line);
+    await phone.getByRole("button", { name: "Send" }).click();
+    await expect(phone.getByText(reply, { exact: false })).toBeVisible();
+  }
 
-  // Tapping a suggestion sends it as a voice note; a new name asks before adding.
-  await chat.getByRole("group", { name: "Suggested messages" }).getByRole("button").first().click(); // Sunita ne 200 diye
-  await expect(chat.getByText("Sunita: ₹200 mile. Total baaki: ₹450.", { exact: false })).toBeVisible({ timeout: 8000 });
-  await chat.getByLabel("Type a message").fill("Kishore ko 250 ka udhaar");
-  await chat.getByRole("button", { name: "Send" }).click();
-  await expect(chat.getByText("“Kishore” naam ka koi customer nahi hai.", { exact: false })).toBeVisible();
-  await chat.getByRole("button", { name: /Haan/ }).click();
-  await expect(khata.getByText("Kishore")).toBeVisible();
-  await chat.getByLabel("Type a message").fill("galat");
-  await chat.getByRole("button", { name: "Send" }).click();
-  await expect(chat.getByText("Kishore ji ka baaki ab ₹0 hai.", { exact: false })).toBeVisible();
+  // 4. Sunday: every customer with dues gets a reminder in their own language.
+  await phone.getByRole("button", { name: "It’s Sunday — send reminders" }).click();
+  await expect(phone.getByText("Ravivaar ke reminder bhej diye (3)", { exact: false })).toBeVisible();
+  const views = page.getByRole("tablist", { name: "Whose phone" });
+  await expect(views.getByRole("tab", { name: "Ramesh’s phone" })).toHaveAttribute("aria-selected", "true", { timeout: 5000 });
+  await expect(phone.getByText("आपका ₹1,130 बाकी है", { exact: false })).toBeVisible();
+  await expect(phone.getByRole("button", { name: "Play voice note in हिंदी" })).toBeVisible();
+  await views.getByRole("tab", { name: "Sunita’s phone" }).click();
+  await expect(phone.getByText("तुमचे ₹450 बाकी आहेत", { exact: false })).toBeVisible();
+  await views.getByRole("tab", { name: "Priya’s phone" }).click();
+  await expect(phone.getByText("તમારા ₹270 બાકી છે", { exact: false })).toBeVisible();
+  await phone.getByRole("button", { name: /Pay ₹270 to Sharma Kirana/ }).click();
+  const sheet = phone.getByRole("dialog", { name: "Pay Sharma Kirana" });
+  await expect(sheet.getByText("₹270", { exact: true })).toBeVisible();
+  await expect(sheet.getByText("Demo only — no money moves.", { exact: false })).toBeVisible();
+  await sheet.getByRole("button", { name: "Close payment page" }).click();
+  await expect(sheet).toHaveCount(0);
 
   await page.getByRole("button", { name: "Start over" }).click();
   await expect(khata.getByText("₹900")).toBeVisible();
-  await expect(khata.getByText("Kishore")).toHaveCount(0);
-  await page.getByRole("link", { name: "Open your free khata" }).click();
-  await expect(page).toHaveURL(/#\/workspace$/);
+  await expect(views).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

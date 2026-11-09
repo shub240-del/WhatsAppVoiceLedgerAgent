@@ -48,7 +48,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  height: min(780px, calc(100dvh - 100px));
+  height: min(760px, calc(100dvh - 150px));
   min-height: 560px;
   border: 10px solid #1b1c20;
   border-radius: 46px;
@@ -245,3 +245,87 @@
   .wd-bar { justify-content: space-between; }
 }
 @media (max-width: 900px) { .wd-status { display: none; } }
+
+/* ---------- Sunday reminders ---------- */
+.wd-phone-col { display: grid; align-content: start; gap: 12px; min-width: 0; }
+.wd-phone { position: relative; }
+.wd-views { display: flex; flex-wrap: wrap; gap: 6px; }
+.wd-views button {
+  padding: 6px 12px;
+  border: 1px solid var(--wd-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wd-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.wd-views button[aria-selected="true"] { background: #f4f5f7; border-color: #f4f5f7; color: #0d0e12; font-weight: 600; }
+.wd-avatar.shop, .wd-me.shop { background: #8a4b16; }
+.wd-play-btn { border: 0; background: none; padding: 0; width: 30px; height: 30px; cursor: pointer; color: var(--wa-sub); }
+.wd-wave.is-playing i { animation: wd-bar 0.9s ease-in-out infinite alternate; background: #00735e; }
+@keyframes wd-bar { to { transform: scaleY(0.35); } }
+@media (prefers-reduced-motion: reduce) { .wd-wave.is-playing i { animation: none; } }
+.wd-row.bot .wd-voice .wd-wave i { background: #9aa9a2; }
+.wd-row.bot .wd-voice .wd-wave.is-playing i { background: #00735e; }
+.wd-linkcard {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  margin: 8px 0 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #f0f2f5;
+  color: var(--wa-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.wd-linkcard b { font-size: 14.5px; }
+.wd-linkcard small { color: var(--wa-sub); font-size: 13px; }
+.wd-linkcard u { color: #01628d; font-size: 13px; text-decoration: none; overflow-wrap: anywhere; }
+.wd-linkcard:hover u { text-decoration: underline; }
+.wd-placeholder { flex: 1; }
+.wd-suggest-action button { background: #00735e; border-color: #00735e; color: #fff; }
+
+.wd-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(11 20 26 / 0.45);
+  animation: wd-fade 0.18s ease-out;
+}
+.wd-sheet-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 22px 22px 26px;
+  border-radius: 18px 18px 0 0;
+  background: #fff;
+  color: var(--wa-ink);
+  text-align: center;
+  animation: wd-up 0.22s ease-out;
+}
+.wd-sheet-close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #f0f2f5; color: var(--wa-ink); cursor: pointer; }
+.wd-sheet-shop { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #8a4b16; color: #fff; }
+.wd-sheet-card h2 { font-size: 17px; font-weight: 600; }
+.wd-sheet-amount { font-size: 34px !important; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.wd-sheet-sub { color: var(--wa-sub) !important; font-size: 14px; }
+.wd-qr { display: grid; grid-template-columns: repeat(7, 14px); gap: 2px; margin: 10px 0; padding: 8px; border: 1px solid #e3e6e8; border-radius: 8px; }
+.wd-qr i { width: 14px; height: 14px; background: #f0f2f5; }
+.wd-qr i.on { background: #111b21; }
+.wd-sheet-pay { width: 100%; min-height: 46px; border: 0; border-radius: 24px; background: #00735e; color: #fff; font: inherit; font-weight: 600; font-size: 16px; cursor: pointer; }
+.wd-sheet-note { color: var(--wa-sub) !important; font-size: 12.5px; line-height: 1.4; }
+@keyframes wd-fade { from { opacity: 0; } }
+@keyframes wd-up { from { transform: translateY(30px); } }
+@media (prefers-reduced-motion: reduce) { .wd-sheet, .wd-sheet-card { animation: none; } }
+.wd-khata small { margin-left: 6px; color: var(--wd-muted); font-size: 13px; }
+@media (max-width: 900px) {
+  .wd-phone-col { gap: 0; }
+  .wd-views { padding: 8px 12px; background: #0d0e12; }
+}

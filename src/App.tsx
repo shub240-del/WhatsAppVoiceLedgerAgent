@@ -3,7 +3,6 @@ import { ArrowLeft, AudioLines, LoaderCircle, RefreshCw } from "lucide-react";
 import { LandingPage } from "./components/LandingPage";
 import { resolveGoogleRedirectResult } from "./lib/google-auth";
 import { authErrorMessage } from "./lib/auth-errors";
-import { getAdditionalUserInfo } from "firebase/auth";
 
 const Dashboard = lazy(() => import("./Dashboard"));
 const AuthDialog = lazy(() =>
@@ -49,8 +48,7 @@ export default function App() {
       .then((credential) => {
         if (!active || !credential) return;
         setAuthMode(null);
-        const newUser = getAdditionalUserInfo(credential)?.isNewUser;
-        window.location.hash = newUser ? "/workspace?setup=1" : "/workspace";
+        window.location.hash = "/workspace";
       })
       .catch((error: unknown) => {
         if (active) setAuthRedirectError(authErrorMessage(error));

@@ -116,7 +116,7 @@ export function useWorkspace() {
           // Spark plan or quota exceeded: derive from loaded customers.
           balance = customerDocs.docs
             .slice(0, customerPage)
-            .reduce((acc, d) => acc + (Number(d.get("balancePaise")) || 0), 0);
+            .reduce((acc, d) => acc + Math.max(Number(d.get("balancePaise")) || 0, 0), 0); // advances are not money to collect
         }
         const entryRows = entryDocs.docs
           .slice(0, entryPage)

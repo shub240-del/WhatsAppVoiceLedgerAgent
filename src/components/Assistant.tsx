@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AudioLines, LoaderCircle, Mic, Send, Square, Undo2 } from "lucide-react";
+import { AudioLines, LoaderCircle, Mic, Send, Square, Undo2, Volume2, VolumeX } from "lucide-react";
 import { api } from "../lib/api";
 import { blobToBase64, MAX_RECORD_MS, WavRecorder } from "../lib/recorder";
+import { spokenText } from "../lib/speech";
 
 type Turn = {
   turnId: string;
@@ -12,6 +13,32 @@ type Turn = {
   entryId: string | null;
   options: { key: number; label: string }[];
 };
+// "Speak" from anywhere in the app (sidebar button, mobile mic). If the assistant isn't on screen yet,
+// the request waits and is picked up as soon as it mounts.
+let pendingListen = false;
+const LISTEN_EVENT = "udhaar:listen";
+export function requestListen() {
+  pendingListen = true;
+  window.dispatchEvent(new Event(LISTEN_EVENT));
+}
+
+const SPEAK_KEY = "udhaar.readAloud";
+function readAloudSaved() {
+  try {
+    return localStorage.getItem(SPEAK_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+function speak(reply: string) {
+  if (!("speechSynthesis" in window) || !reply) return;
+  const u = new SpeechSynthesisUtterance(spokenText(reply));
+  u.lang = "hi-IN";
+  u.rate = 1;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+
 type Message =
   | { id: string; from: "owner"; text: string; voice: boolean; pending?: boolean }
   | { id: string; from: "bot"; turn: Turn; undone?: boolean }
@@ -29,6 +56,31 @@ export function Assistant({ onChanged, disabled }: { onChanged(): void; disabled
   const recorder = useRef<WavRecorder | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const micSupported = WavRecorder.supported();
+  const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
+  const [readAloud, setReadAloud] = useState(readAloudSaved);
+  const listen = useRef<() => void>(() => {});
+  listen.current = () => {
+    pendingListen = false;
+    // Tap to start; tapping the big mic again while listening stops and sends.
+    if (micSupported && !disabled && !busy) void toggleMic();
+    document.getElementById("assistant")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  useEffect(() => {
+    const onListen = () => listen.current();
+    window.addEventListener(LISTEN_EVENT, onListen);
+    if (pendingListen) listen.current();
+    return () => window.removeEventListener(LISTEN_EVENT, onListen);
+  }, []);
+  function toggleReadAloud() {
+    const next = !readAloud;
+    setReadAloud(next);
+    if (!next) window.speechSynthesis?.cancel();
+    try {
+      localStorage.setItem(SPEAK_KEY, next ? "on" : "off");
+    } catch {
+      /* private mode: setting lasts for this visit only */
+    }
+  }
 
   useEffect(() => {
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" });
@@ -52,6 +104,8 @@ export function Assistant({ onChanged, disabled }: { onChanged(): void; disabled
         { id: `b-${turnId}`, from: "bot", turn },
       ]);
       if (turn.kind === "saved" || turn.kind === "undone") onChanged();
+      // Spoke to it? It answers out loud, so the owner can keep their eyes on the customer.
+      if (voice && readAloud && canSpeak) speak(turn.reply);
     } catch (e) {
       setMessages((m) => [
         ...m.map((x) => (x.id === ownerId && x.from === "owner" ? { ...x, pending: false } : x)),
@@ -123,6 +177,18 @@ export function Assistant({ onChanged, disabled }: { onChanged(): void; disabled
           <h2>Bolo, hisaab ho jayega</h2>
           <p>Speak or type an entry. If anything is unclear, I’ll ask — I never guess.</p>
         </div>
+        {canSpeak && (
+          <button
+            type="button"
+            className="assistant-voice-toggle"
+            aria-pressed={readAloud}
+            aria-label="Read replies aloud"
+            title={readAloud ? "Replies are read aloud after you speak" : "Replies are not read aloud"}
+            onClick={toggleReadAloud}
+          >
+            {readAloud ? <Volume2 size={17} /> : <VolumeX size={17} />}
+          </button>
+        )}
       </div>
 
       <div className="assistant-log" ref={list} aria-live="polite">

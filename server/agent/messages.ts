@@ -13,7 +13,7 @@ export const msg = {
   multiple: "Ek message mein ek hi entry bhejein. Kuch save nahi hua — har customer ke liye alag bhejein.",
   unsupported: "Yeh kaam main nahi kar sakta. Udhaar, payment, baaki ya GALAT ke liye bolein. Kuch save nahi hua.",
   askAmount: "Kitne rupaye likhne hain?",
-  askCustomerNone: "Kaun sa customer? Naam dobara bolein. Naya customer dashboard se jodein.",
+  askCustomerNone: "Kaun sa customer? Naam saaf bolein, jaise 'Ramesh ko 340 ka udhaar'.",
   expired: "Woh sawal purana ho gaya. Poori entry dobara bolein.",
   alreadyDone: "Yeh entry ho chuka hai.",
   cancelled: "Theek hai, kuch save nahi kiya.",
@@ -36,5 +36,8 @@ export const msg = {
     `${formatRupees(amount)} ka entry hata diya (reversal darj hua). ${name} ji ka baaki ab ${formatRupees(balance)} hai.`,
   advance: (amount: number, balance: number) =>
     `${formatRupees(amount)} baaki (${formatRupees(balance)}) se zyada hai. Advance maanein?\n1) Haan\n2) Nahi`,
+  newCustomer: (name: string, action: "add_credit" | "add_payment", amount: number | null) =>
+    `"${name}" naam ka koi customer nahi hai. Naya customer "${name}" banakar ${amount ? `${formatRupees(amount)} ${action === "add_credit" ? "udhaar" : "payment"} likhun` : "jod dun"}?\n1) Haan\n2) Nahi`,
+  customerAdded: (name: string) => `${name} naye customer jud gaye.`,
   large: (amount: number) => `${formatRupees(amount)} bahut bada amount hai. Pakka likhna hai?\n1) Haan\n2) Nahi`,
 };

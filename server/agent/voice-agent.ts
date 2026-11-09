@@ -16,7 +16,7 @@ import { sttLanguages } from "../languages.js";
 
 export const PENDING_TTL_MS = 15 * 60 * 1000;
 type Option = { key: number; id: string; label: string };
-type ConfirmKind = "advance" | "large";
+type ConfirmKind = "advance" | "large" | "new_customer";
 
 export type StoredDecision =
   | { kind: "none" }
@@ -39,6 +39,7 @@ const words = (t: string) => t.trim().split(/\s+/).filter(Boolean);
 const latin = (t: string) => transliterate(t).toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 const UNDO = /^(galat|galti|undo|wrong|hata do|hatao|cancel karo|galat hai|galat entry)$/;
 const CANCEL = /^(nahi rehne do|rehne do|nahi|cancel|chhodo|mat likho|no)$/;
+const NEW_CUSTOMER = "__new__";
 const YES = /^(1|haan|han|ha|yes|ji|theek|ok|okay|sahi|haan ji)$/;
 const NO = /^(2|nahi|na|no)$/;
 
@@ -201,6 +202,10 @@ export class VoiceAgent {
     const pick = /^\d$/.test(text) ? options.find((o) => o.key === Number(text)) : undefined;
     if (missing === "entry_choice") return pick ? { kind: "undo", entryId: pick.id, resolves: pending.id } : null;
     if (!state) return null;
+    if (missing === "confirmation" && pending.get("confirmKind") === "new_customer") {
+      if (YES.test(text)) return { kind: "ledger", state, resolves: pending.id };
+      return NO.test(text) ? { kind: "cancel", pendingId: pending.id } : null;
+    }
     if (missing === "confirmation") {
       if (YES.test(text)) {
         const kind = pending.get("confirmKind") as ConfirmKind;
@@ -209,6 +214,7 @@ export class VoiceAgent {
       return NO.test(text) ? { kind: "cancel", pendingId: pending.id } : null;
     }
     if (missing === "customer") {
+      if (pick?.id === NEW_CUSTOMER) return { kind: "ledger", state, resolves: pending.id };
       let id = pick?.id;
       if (!id && words(text).length <= 4) {
         const scope = options.length ? customers.filter((c) => options.some((o) => o.id === c.id)) : customers;
@@ -236,6 +242,16 @@ export class VoiceAgent {
         const options = decision.state.customerOptions
           .map((id) => customers.find((c) => c.id === id)).filter(Boolean)
           .map((c, i) => ({ key: i + 1, id: c!.id, label: `${c!.name}${c!.displayLabel ? ` – ${c!.displayLabel}` : ""}` }));
+        const newName = decision.state.action !== "get_balance" ? decision.state.newCustomerName : null;
+        if (newName && !options.length) {
+          const action = decision.state.action as "add_credit" | "add_payment";
+          return {
+            kind: "ask", missing: "confirmation", state: decision.state, confirmKind: "new_customer", resolves,
+            options: [{ key: 1, id: "yes", label: `Haan, ${newName} ko jodo` }, { key: 2, id: "no", label: "Nahi" }],
+            question: msg.newCustomer(newName, action, decision.state.amountPaise),
+          };
+        }
+        if (newName) options.push({ key: options.length + 1, id: NEW_CUSTOMER, label: `Naya customer: ${newName}` });
         const question = options.length
           ? `Kaun sa customer?\n${options.map((o) => `${o.key}) ${o.label}`).join("\n")}\n${options.map((o) => o.key).join(" ya ")} bhejein.`
           : msg.askCustomerNone;
@@ -302,7 +318,18 @@ export class VoiceAgent {
       }
       case "ledger": {
         if (!(await claim(d.resolves))) return { text: msg.alreadyDone };
-        const s = d.state;
+        let s = d.state;
+        let added = "";
+        if (!s.customerId && s.newCustomerName) {
+          // The owner said yes to a new customer: create them (idempotent on this message), then continue.
+          const created = (await ledger.createCustomer(job.ownerUid!, { name: s.newCustomerName }, `${this.key(job)}-new`)) as { customerId: string };
+          added = msg.customerAdded(s.newCustomerName);
+          s = { ...s, customerId: created.customerId, newCustomerName: null, customerOptions: [] };
+          if (s.action !== "get_balance" && !s.amountPaise) {
+            await settle(d.resolves, "completed");
+            return this.execute(job, { kind: "ask", missing: "amount", state: s, options: [], question: `${added} ${msg.askAmount}`, confirmKind: null, resolves: null }, transcript);
+          }
+        }
         const customer = await shop.collection("customers").doc(s.customerId!).get();
         const name = customer.get("name") ?? "Customer";
         try {
@@ -320,7 +347,8 @@ export class VoiceAgent {
             : { action: "add_payment", customerId: s.customerId, amountPaise: s.amountPaise, notes: s.notes, confirmLargeAmount: s.confirmLargeAmount, confirmAdvance: s.confirmAdvance };
           const r = (await ledger.executeWith(job.ownerUid!, action, this.key(job), context)) as { entryId: string; balancePaise: number };
           await settle(d.resolves, "completed");
-          return { text: s.action === "add_credit" ? msg.credit(name, s.amountPaise!, r.balancePaise, s.notes) : msg.payment(name, s.amountPaise!, r.balancePaise), entryId: r.entryId };
+          const text = s.action === "add_credit" ? msg.credit(name, s.amountPaise!, r.balancePaise, s.notes) : msg.payment(name, s.amountPaise!, r.balancePaise);
+          return { text: added ? `${added} ${text}` : text, entryId: r.entryId };
         } catch (error) {
           if (error instanceof ServiceError && (error.code === "CONFIRM_ADVANCE" || error.code === "CONFIRM_LARGE_AMOUNT")) {
             const kind: ConfirmKind = error.code === "CONFIRM_ADVANCE" ? "advance" : "large";

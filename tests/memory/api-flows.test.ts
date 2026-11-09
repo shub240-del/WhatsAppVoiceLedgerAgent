@@ -79,6 +79,14 @@ test("new owner: no shop yet → 403 everywhere, then self-serve shop creation u
   assert.equal((await call("/api/connection")).status, 200);
 });
 
+test("shop creation stores the language the owner picked; unknown languages are refused", async () => {
+  const bad = await call("/api/onboarding/shop", { uid: "owner-lang", body: { shopName: "Patil Kirana", language: "fr" } });
+  assert.equal(bad.status, 400);
+  const r = await call("/api/onboarding/shop", { uid: "owner-lang", body: { shopName: "Patil Kirana", language: "mr" } });
+  assert.equal(r.status, 201);
+  assert.equal((await db.doc(`shops/${r.json.shopId}`).get()).get("language"), "mr");
+});
+
 test("tenant isolation: owner B cannot read or change owner A's customers or entries by id", async () => {
   await shop("owner-a");
   await shop("owner-b", "Gupta Kirana");

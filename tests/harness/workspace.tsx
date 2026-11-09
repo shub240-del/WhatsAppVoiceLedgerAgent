@@ -3,10 +3,18 @@ import ReactDOM from "react-dom/client";
 import "../../src/index.css";
 import "../../src/a11y.css";
 import Dashboard from "../../src/Dashboard";
+import { auth } from "../../src/lib/firebase";
 import type { Customer, Entry, useWorkspace } from "../../src/lib/useWorkspace";
 
 const at = (min: number) => ({ toDate: () => new Date(Date.UTC(2026, 10, 9, 6, 0) - min * 60_000) });
-const empty = new URLSearchParams(location.search).has("empty");
+const params = new URLSearchParams(location.search);
+const empty = params.has("empty") || params.has("new");
+window.__requests = [];
+Object.defineProperty(auth, "currentUser", { get: () => ({ getIdToken: async () => "test-token" }) });
+window.fetch = (async (url: string, init: RequestInit) => {
+  window.__requests.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : null });
+  return new Response(JSON.stringify({ shopId: "s1", created: true }), { status: 201, headers: { "Content-Type": "application/json" } });
+}) as typeof fetch;
 const customers: Customer[] = empty
   ? []
   : [
@@ -26,13 +34,13 @@ const entries: Entry[] = empty
 const data = {
   user: { uid: "u1", email: "owner@example.com" },
   authReady: true,
-  shop: { id: "s1", name: "Sharma Kirana", language: "hinglish" },
+  shop: params.has("new") ? null : { id: "s1", name: "Sharma Kirana", language: "hinglish" },
   customers,
   entries,
   reversals: new Set<string>(["e3"]),
   totals: { balance: customers.reduce((n, c) => n + c.balancePaise, 0), customers: customers.length, entries: entries.length },
   error: "",
-  needsShop: false,
+  needsShop: params.has("new"),
   loading: false,
   hasMoreCustomers: false,
   hasMoreEntries: false,

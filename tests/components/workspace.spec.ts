@@ -50,3 +50,32 @@ test("empty shop guides to the first customer", async ({ page }) => {
   await page.goto("/tests/harness/workspace.html?empty#/workspace/home");
   await expect(page.getByRole("heading", { name: "Add your first customer" })).toBeVisible();
 });
+
+test("new owner: one onboarding card asks shop name and language, and sends both", async ({ page }) => {
+  await page.goto("/tests/harness/workspace.html?new#/workspace/home");
+  await expect(page.getByRole("heading", { name: "Open your khata" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByLabel("Shop name").fill("Patil Kirana");
+  await page.getByRole("radio", { name: /Marathi/ }).check();
+  await page.getByRole("button", { name: "Open my khata" }).click();
+  await expect.poll(() => page.evaluate(() => window.__requests.find((r) => String(r.url).endsWith("/api/onboarding/shop"))?.body))
+    .toEqual({ shopName: "Patil Kirana", language: "mr" });
+});
+
+test("one tap on the mic, from any page, starts listening", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/tests/harness/workspace.html#/workspace/customers");
+  const mic = page.getByRole("navigation", { name: "Main navigation (mobile)" }).getByRole("button", { name: "Speak an entry" });
+  await mic.click();
+  await expect(page.getByRole("status").filter({ hasText: "Bol rahe hain" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stop and send voice" })).toBeVisible();
+});
+
+test("read-aloud can be switched off and stays off", async ({ page }) => {
+  await page.goto(url);
+  const toggle = page.getByRole("button", { name: "Read replies aloud" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Read replies aloud" })).toHaveAttribute("aria-pressed", "false");
+});

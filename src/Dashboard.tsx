@@ -31,12 +31,12 @@ import { Modal } from "./components/Modal";
 import { CustomerDetail } from "./components/CustomerDetail";
 import { EditEntry } from "./components/EditEntry";
 import { ActivityPanel, IntegrationsGrid, RemindersPanel, type Integration } from "./components/ShopPanels";
-import { SetupGuide } from "./components/SetupGuide";
 import { CreateShop } from "./components/CreateShop";
 import { EntryForm } from "./components/EntryForm";
-import { Assistant } from "./components/Assistant";
+import { Assistant, requestListen } from "./components/Assistant";
 import { ParserEval } from "./components/ParserEval";
 import { displayPhone, toE164 } from "./lib/phone";
+import { balanceWords } from "./lib/reminder";
 import { authErrorMessage } from "./lib/auth-errors";
 
 type Tab = "home" | "customers" | "entries" | "settings" | "advanced";
@@ -87,6 +87,8 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
   const [dialog, setDialog] = useState<Dialog>(null);
   const [entryAction, setEntryAction] = useState<Action>("add_credit");
   const [selectedCustomer, setSelectedCustomer] = useState("");
+  // Opened "Udhaar diya / Paisa mila" from a customer's page? Go back there afterwards.
+  const [entryFrom, setEntryFrom] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [busy, setBusy] = useState(false);
@@ -96,7 +98,6 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
   const [reason, setReason] = useState("");
   const [detailCustomer, setDetailCustomer] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
-  const [setup, setSetup] = useState(window.location.hash.includes("setup=1"));
   const [newName, setNewName] = useState("");
   const [connection, setConnection] = useState<"idle" | "checking" | "ok" | "error">("idle");
   const [connectionMessage, setConnectionMessage] = useState("");
@@ -144,20 +145,22 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
     operation.current = null;
     setDialog(user || next === "help" ? next : "login");
   }
-  function openEntry(action: Action, customerId = "") {
+  function openEntry(action: Action, customerId = "", fromDetail = false) {
     setEntryAction(action);
     setSelectedCustomer(customerId);
+    setEntryFrom(fromDetail ? customerId : null);
     setDetailCustomer(null);
     open("entry");
   }
+  function closeEntry() {
+    setDialog(null);
+    if (entryFrom) setDetailCustomer(entryFrom);
+    setEntryFrom(null);
+  }
   function speak() {
-    // Voice-first: the mic button always lands on the assistant, ready to listen.
+    // Voice-first: one tap anywhere starts listening on the Home assistant.
     if (tab !== "home") navigate("home");
-    requestAnimationFrame(() => {
-      const panel = document.getElementById("assistant");
-      panel?.scrollIntoView({ behavior: "smooth", block: "center" });
-      panel?.querySelector<HTMLButtonElement>("button[aria-label*='ecord'], button[aria-label*='ic']")?.focus();
-    });
+    requestListen();
   }
   function keyFor(payload: unknown) {
     const serialized = JSON.stringify(payload);
@@ -254,9 +257,9 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
       };
       const result = await api<{ balancePaise: number }>("/api/ledger/actions", payload, keyFor(payload));
       operation.current = null;
-      setDialog(null);
+      closeEntry();
       workspace.refresh();
-      setToast(`Saved. ${customerName(payload.customerId)} now owes ${money(result.balancePaise)}.`);
+      setToast(`Saved. ${balanceWords(customerName(payload.customerId), result.balancePaise)}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Nothing was saved. Try again.");
     } finally {
@@ -280,7 +283,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
       operation.current = null;
       setReversing(null);
       workspace.refresh();
-      setToast(`Entry cancelled. ${customerName(reversing.customerId)} now owes ${money(result.balancePaise)}.`);
+      setToast(`Entry cancelled. ${balanceWords(customerName(reversing.customerId), result.balancePaise)}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Reversal failed.");
     } finally {
@@ -300,7 +303,6 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
       setDetailCustomer(null);
       setEditingEntry(null);
       setReversing(null);
-      setSetup(false);
       setToast("Signed out.");
     } catch (e) {
       setToast(authErrorMessage(e));
@@ -488,7 +490,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
                   <section className="k-card k-row-card">
                     <div>
                       <h2>Add your first customer</h2>
-                      <p className="k-muted">Then say or type their udhaar.</p>
+                      <p className="k-muted">Or just say “Ramesh ko 340 ka udhaar” — I’ll offer to add Ramesh for you.</p>
                     </div>
                     <button className="k-btn k-btn-primary" onClick={() => open("customer")}>
                       <Plus size={15} />
@@ -722,7 +724,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
         <Modal
           title={entryAction === "add_credit" ? "Udhaar diya" : "Paisa mila"}
           eyebrow={entryAction === "add_credit" ? "YOU GAVE" : "YOU GOT"}
-          close={() => !busy && setDialog(null)}
+          close={() => !busy && closeEntry()}
         >
           {!customers.length ? (
             <Empty title="Add a customer first" action="Add customer" onClick={() => open("customer")} />
@@ -788,6 +790,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
       {detailCustomer && shop && (
         <CustomerDetail
           shopId={shop.id}
+          shopName={shop.name}
           customerId={detailCustomer}
           close={() => setDetailCustomer(null)}
           onChanged={workspace.refresh}
@@ -796,7 +799,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
             setDetailCustomer(null);
             setEditingEntry(e);
           }}
-          onAdd={(action) => openEntry(action, detailCustomer)}
+          onAdd={(action) => openEntry(action, detailCustomer, true)}
         />
       )}
       {editingEntry && (
@@ -807,20 +810,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
           done={(balance) => {
             setEditingEntry(null);
             workspace.refresh();
-            setToast(`Fixed. New balance: ${money(balance)}.`);
-          }}
-        />
-      )}
-      {setup && user && (
-        <SetupGuide
-          user={user}
-          shopName={shop?.name}
-          hasCustomers={totals.customers > 0}
-          close={() => setSetup(false)}
-          refresh={workspace.refresh}
-          addCustomer={() => {
-            setSetup(false);
-            open("customer");
+            setToast(`Fixed. ${balanceWords(customerName(editingEntry.customerId), balance)}`);
           }}
         />
       )}

@@ -10,6 +10,8 @@ export type OpState = {
   notes: string;
   confirmAdvance: boolean;
   confirmLargeAmount: boolean;
+  /** A spoken name that matches nobody in the khata. Only ever saved after the owner says yes. */
+  newCustomerName?: string | null;
 };
 export type FindFilters = {
   customerId: string | null;
@@ -39,6 +41,19 @@ function istDayBoundary(date: string | null, end: boolean) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+// Hindi/Marathi/Gujarati case markers and honorifics that trail a spoken name ("Ramesh ko", "Sunita ji ne").
+const NAME_TAIL = new Set(["ko", "ne", "ka", "ki", "ke", "se", "ji", "la", "na", "ne", "nu", "ni", "no", "che", "chi", "cha", "को", "ने", "का", "की", "के", "से", "जी"]);
+
+/** Turns the quoted customer phrase into a clean display name, or null if it doesn't look like a name. */
+export function spokenName(phrase: string | null): string | null {
+  if (!phrase || /\d/.test(phrase)) return null;
+  const words = phrase.replace(/[^\p{L}\p{M}\s.'-]/gu, " ").split(/\s+/).filter(Boolean);
+  while (words.length && NAME_TAIL.has(words[words.length - 1].toLowerCase())) words.pop();
+  if (!words.length || words.length > 3) return null;
+  const name = words.map((w) => (/^[a-z]/i.test(w) ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w)).join(" ");
+  return name.length >= 2 && name.length <= 40 ? name : null;
+}
+
 function resolveFor(p: Proposal, transcript: string, customers: MatchCustomer[]) {
   // Evidence must genuinely occur in the transcript; otherwise it is ignored.
   const phrase = p.evidence.customer_phrase && phraseInTranscript(p.evidence.customer_phrase, transcript)
@@ -49,11 +64,13 @@ function resolveFor(p: Proposal, transcript: string, customers: MatchCustomer[])
   if (resolution.kind === "unique") {
     // The model's choice must agree with the server's independent match.
     if (modelPick && modelPick !== resolution.id) {
-      return { customerId: null, options: [resolution.id, modelPick] };
+      return { customerId: null, options: [resolution.id, modelPick], newName: null };
     }
-    return { customerId: resolution.id, options: [] as string[] };
+    return { customerId: resolution.id, options: [] as string[], newName: null };
   }
-  return { customerId: null, options: resolution.options };
+  // Nobody plausibly matches: this may be a new customer. Offered to the owner, never created silently.
+  const newName = resolution.kind === "none" ? spokenName(phrase) : null;
+  return { customerId: null, options: resolution.options, newName };
 }
 
 /** How many distinct customer names (or aliases) appear as whole words in the transcript. */
@@ -90,7 +107,7 @@ export function decide(p: Proposal, transcript: string, customers: MatchCustomer
       if (p.action === "ask_clarification" && p.missing !== "amount" && p.missing !== "customer") {
         return { kind: "reject", reason: spokenAmounts.length > 1 ? "multiple" : "unsupported" };
       }
-      const { customerId, options } = resolveFor(p, transcript, customers);
+      const { customerId, options, newName } = resolveFor(p, transcript, customers);
       let amountPaise: number | null = null;
       const phrase = p.evidence.amount_phrase;
       if (phrase && phraseInTranscript(phrase, transcript)) {
@@ -107,6 +124,7 @@ export function decide(p: Proposal, transcript: string, customers: MatchCustomer
       return nextStep({
         action, customerId, customerOptions: options, amountPaise,
         notes: (p.items ?? "").slice(0, 300), confirmAdvance: false, confirmLargeAmount: false,
+        newCustomerName: customerId ? null : newName,
       });
     }
   }

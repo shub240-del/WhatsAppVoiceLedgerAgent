@@ -57,3 +57,64 @@ test("the same turn id twice writes only one entry", async () => {
   await runAssistantTurn(db, A.uid, input, { parser, stt: null });
   assert.equal((await db.collection(`shops/${A.shopId}/ledgerEntries`).get()).size, 1);
 });
+
+// A first-time owner's first sentence usually names someone not in the khata yet.
+const newCredit = (name: string, rupees: number | null, phrase = name) =>
+  proposal({ action: "add_credit", customer_candidate_id: null, amount_paise: rupees ? rupees * 100 : null, missing: "customer", evidence: { customer_phrase: phrase, amount_phrase: rupees ? String(rupees) : null } });
+const customersNamed = async (name: string) =>
+  (await db.collection(`shops/${A.shopId}/customers`).where("name", "==", name).get()).docs;
+
+test("new customer by voice: asks first, then 'Haan' creates them and saves the udhaar", async () => {
+  parser.script["Kishore ko 250 ka udhaar"] = newCredit("Kishore", 250, "Kishore ko");
+  const q = await turn("Kishore ko 250 ka udhaar");
+  assert.equal(q.kind, "question");
+  assert.match(q.reply, /"Kishore" naam ka koi customer nahi hai/);
+  assert.match(q.reply, /₹250 udhaar likhun/);
+  assert.deepEqual(q.options.map((o) => o.label), ["Haan, Kishore ko jodo", "Nahi"]);
+  assert.equal((await customersNamed("Kishore")).length, 0, "nothing is created before the owner agrees");
+
+  const done = await turn("1", q.replyId!);
+  assert.equal(done.kind, "saved");
+  assert.match(done.reply, /Kishore naye customer jud gaye\. Kishore: \+₹250/);
+  const [kishore] = await customersNamed("Kishore");
+  assert.equal(kishore.get("balancePaise"), 25000);
+
+  // Same answer delivered again (double tap / retry) creates nothing new.
+  await turn("1", q.replyId!);
+  assert.equal((await customersNamed("Kishore")).length, 1);
+  assert.equal((await db.collection(`shops/${A.shopId}/ledgerEntries`).where("customerId", "==", kishore.id).get()).size, 1);
+});
+
+test("new customer by voice: 'Nahi' creates nothing", async () => {
+  parser.script["Kishore ko 250 ka udhaar"] = newCredit("Kishore", 250);
+  const q = await turn("Kishore ko 250 ka udhaar");
+  const no = await turn("2", q.replyId!);
+  assert.equal(no.kind, "info");
+  assert.equal((await customersNamed("Kishore")).length, 0);
+  assert.equal((await db.collection(`shops/${A.shopId}/ledgerEntries`).get()).size, 0);
+});
+
+test("new customer without an amount: adds them, then asks how much", async () => {
+  parser.script["Kishore ka udhaar likho"] = newCredit("Kishore", null);
+  const q = await turn("Kishore ka udhaar likho");
+  assert.match(q.reply, /Naya customer "Kishore" banakar jod dun\?/);
+  const ask = await turn("1", q.replyId!);
+  assert.equal(ask.kind, "question");
+  assert.match(ask.reply, /Kishore naye customer jud gaye\. Kitne rupaye/);
+  const done = await turn("300", ask.replyId!);
+  assert.equal(done.kind, "saved");
+  assert.equal((await customersNamed("Kishore"))[0].get("balancePaise"), 30000);
+});
+
+test("a name the model did not hear in the transcript is never offered as a new customer", async () => {
+  parser.script["usko 250 ka udhaar"] = newCredit("Kishore", 250);
+  const q = await turn("usko 250 ka udhaar");
+  assert.doesNotMatch(q.reply, /Kishore/);
+  assert.equal((await customersNamed("Kishore")).length, 0);
+});
+
+test("balance question for an unknown name does not offer to create a customer", async () => {
+  parser.script["Kishore ka kitna baaki hai"] = proposal({ action: "get_balance", customer_candidate_id: null, amount_paise: null, evidence: { customer_phrase: "Kishore", amount_phrase: null } });
+  const q = await turn("Kishore ka kitna baaki hai");
+  assert.doesNotMatch(q.reply, /naya customer/i);
+});

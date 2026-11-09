@@ -9,6 +9,7 @@ const shopInput = z
   .object({
     shopName: z.string().trim().min(2).max(80),
     ownerPhone: phoneSchema.optional(),
+    language: z.enum(SHOP_LANGUAGES).optional(),
   })
   .strict();
 const phoneInput = z.object({ ownerPhone: phoneSchema.nullable() }).strict();
@@ -48,7 +49,7 @@ export class OnboardingService {
       tx.create(this.db.doc(`shops/${shopId}`), {
         name: data.shopName,
         active: true,
-        language: "hinglish",
+        language: data.language ?? "hinglish",
         timezone: "Asia/Kolkata",
         remindersEnabled: false,
         policyGate: "NOT_APPROVED",

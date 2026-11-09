@@ -1,18 +1,19 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, startAfter, where, type QueryDocumentSnapshot } from "firebase/firestore";
-import { BellOff, BellRing, Check, LoaderCircle, Pencil, Undo2 } from "lucide-react";
+import { BellOff, BellRing, Check, LoaderCircle, MessageCircle, Pencil, Phone, Undo2 } from "lucide-react";
 import { db } from "../lib/firebase";
 import { api } from "../lib/api";
 import { money } from "../lib/money";
 import { displayPhone, toE164 } from "../lib/phone";
 import type { Entry } from "../lib/useWorkspace";
+import { reminderLink } from "../lib/reminder";
 import { Modal } from "./Modal";
 
 const dateFormat = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
 type Customer = { name: string; displayLabel: string; phone?: string | null; aliases?: string[]; balancePaise: number };
 
-export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse, onEdit, onAdd }: {
-  shopId: string; customerId: string; close(): void; onChanged(): void; onReverse(e: Entry): void; onEdit(e: Entry): void; onAdd?(action: "add_credit" | "add_payment"): void;
+export function CustomerDetail({ shopId, shopName, customerId, close, onChanged, onReverse, onEdit, onAdd }: {
+  shopId: string; shopName?: string; customerId: string; close(): void; onChanged(): void; onReverse(e: Entry): void; onEdit(e: Entry): void; onAdd?(action: "add_credit" | "add_payment"): void;
 }) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [consent, setConsent] = useState("unknown");
@@ -111,6 +112,22 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
         <div><small>Phone</small><strong>{customer.phone ? displayPhone(customer.phone) : "Not added"}</strong></div>
         <div><small>Sunday reminder</small><strong>{!customer.phone ? "Skipped · no phone" : consent === "opted_in" ? "Agreed" : consent === "opted_out" ? "Said no" : "Not asked yet"}</strong></div>
       </div>
+      {(customer.balancePaise > 0 || customer.phone) && (
+        <div className="k-contact">
+          {customer.balancePaise > 0 && (
+            <a className="k-btn" href={reminderLink(customer, shopName)} target="_blank" rel="noopener noreferrer">
+              <MessageCircle size={15} />
+              Remind on WhatsApp
+            </a>
+          )}
+          {customer.phone && (
+            <a className="k-btn" href={`tel:${customer.phone}`}>
+              <Phone size={15} />
+              Call
+            </a>
+          )}
+        </div>
+      )}
       {onAdd && (
         <div className="k-give-get">
           <button type="button" className="k-btn k-btn-give" onClick={() => onAdd("add_credit")}>Udhaar diya <small>You gave</small></button>

@@ -68,7 +68,12 @@ Set in Vercel → Project → Settings → Environment Variables, then redeploy:
 | --- | --- |
 | `FIREBASE_SERVICE_ACCOUNT` | Full service-account JSON (Firebase console → Project settings → Service accounts → Generate new private key). Secret; never commit it. |
 | `ALLOWED_ORIGIN` | Optional. Defaults to `https://<production domain>`. |
-| `META_*`, `GNANI_API_KEY`, `APP_GEMINI_*` | Later, when WhatsApp / voice providers are connected. |
+| `GNANI_API_KEY` | Gnani speech-to-text key (https://app.gnani.ai/voice). Secret. Optional tuning: `GNANI_STT_MODEL` (default `prisma-v3.0`), `GNANI_STT_LANGUAGES` (default `hi-IN,en-IN`), `GNANI_STT_FORMAT`. See `.env.example`. |
+| `META_*`, `APP_GEMINI_*` | Later, when WhatsApp / the LLM parser are connected. |
+
+After adding `GNANI_API_KEY` and redeploying, open Settings → Connections & setup status →
+**Test Gnani key** (or run `pnpm check:gnani-env --live` locally with the key in `.env.local`).
+Voice notes are limited to 30 seconds because Gnani's STT REST endpoint rejects longer audio.
 
 Until `FIREBASE_SERVICE_ACCOUNT` is set, the API answers `503 SERVER_NOT_CONFIGURED` and the
 dashboard shows that message instead of saving. Check with `https://<domain>/health` → `{"status":"ok"}`.

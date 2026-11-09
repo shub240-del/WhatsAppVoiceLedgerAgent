@@ -3,7 +3,7 @@ import { Timestamp, type DocumentSnapshot, type Firestore, type QueryDocumentSna
 import { ServiceError } from "../domain.js";
 import type { LedgerService } from "../ledger.js";
 import type { SpeechToText } from "../adapters.js";
-import { validateAudio } from "../audio.js";
+import { MAX_AUDIO_MS, validateAudio } from "../audio.js";
 import { extractAmounts, formatRupees, parseAmountPhrase } from "../money-words.js";
 import { resolveCustomer, transliterate, type MatchCustomer } from "../matching.js";
 import type { WhatsAppGateway } from "../whatsapp/client.js";
@@ -104,7 +104,7 @@ export class VoiceAgent {
     const media = await this.deps.whatsapp.fetchMedia(job.mediaId);
     const { durationMs } = validateAudio(media.bytes, media.mimeType);
     const result = await this.deps.stt.transcribe(media.bytes, ["hi-IN", "en-IN"], media.mimeType);
-    if ((result.durationMs ?? durationMs ?? 0) > 60_000) throw new UnusableAudio("too_long");
+    if ((result.durationMs ?? durationMs ?? 0) > MAX_AUDIO_MS) throw new UnusableAudio("too_long");
     if (result.confidence !== null && result.confidence < 0.7) throw new UnusableAudio("low_confidence");
     if (words(result.text).length < 2) throw new UnusableAudio("empty_transcript");
     return result.text;

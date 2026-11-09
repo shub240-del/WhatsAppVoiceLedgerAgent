@@ -52,13 +52,13 @@ export function geminiConfig(env: Env = process.env): { config: GeminiConfig | n
 }
 
 export function integrationStatuses(env: Env = process.env): IntegrationStatus[] {
-  const gnani = gnaniEnvironmentStatus(env).credentialsConfigured;
+  const gnani = gnaniEnvironmentStatus(env);
   return [
     whatsappConfig(env).status,
     geminiConfig(env).status,
-    { provider: "prisma", role: "Speech-to-text", state: "BLOCKED_EXTERNALLY", detail: get(env, "PRISMA_API_KEY") ? "Key present; API documentation not supplied, adapter not implemented." : "No documentation or key supplied." },
-    { provider: "timbre", role: "Text-to-speech", state: "BLOCKED_EXTERNALLY", detail: get(env, "TIMBRE_API_KEY") ? "Key present; API documentation not supplied, adapter not implemented." : "No documentation or key supplied." },
-    { provider: "gnani", role: "Speech AI (PRD 'Gyani')", state: gnani ? "BLOCKED_EXTERNALLY" : "NOT_CONFIGURED", detail: gnani ? "GNANI_API_KEY present; API documentation not supplied." : "GNANI_API_KEY not set." },
+    { provider: "prisma", role: "Speech-to-text (Gnani Prisma)", state: gnani.state === "configured" ? "CONFIGURED" : gnani.state === "invalid" ? "INVALID" : "NOT_CONFIGURED", detail: gnani.state === "configured" ? `Gnani ${gnani.model}, languages ${gnani.languages?.join(", ")}. Use “Test Gnani key” to confirm it works.` : gnani.problems.join(" ") || "Uses GNANI_API_KEY." },
+    { provider: "timbre", role: "Text-to-speech (Gnani Timbre)", state: "NOT_CONFIGURED", detail: "Not needed yet: replies are sent as text. Uses the same GNANI_API_KEY when voice replies are added." },
+    { provider: "gnani", role: "Speech AI (PRD 'Gyani')", state: gnani.state === "configured" ? "CONFIGURED" : gnani.state === "invalid" ? "INVALID" : "NOT_CONFIGURED", detail: gnani.state === "configured" ? "GNANI_API_KEY present and settings valid. Live validity is confirmed only by “Test Gnani key”." : gnani.problems.join(" ") },
     { provider: "nvidia", role: "Optional alternative LLM", state: "NOT_CONFIGURED", detail: "Optional. No adapter implemented; Gemini is the active parser." },
     { provider: "reminders", role: "Sunday customer reminders", state: "DISABLED_BY_POLICY", detail: `Policy gate ${reminderPolicy.gate}. Requires written Meta/BSP approval.` },
   ];

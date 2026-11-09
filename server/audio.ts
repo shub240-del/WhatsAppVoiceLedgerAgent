@@ -3,7 +3,8 @@ import { UnusableAudio } from "./agent/errors.js";
 // WhatsApp-supported inbound audio types (Cloud API media docs). OGG must be Opus.
 const ALLOWED = new Set(["audio/ogg", "audio/opus", "audio/mpeg", "audio/amr", "audio/mp4", "audio/aac"]);
 export const MAX_AUDIO_BYTES = 16 * 1024 * 1024;
-export const MAX_AUDIO_MS = 60_000;
+// Gnani STT REST accepts at most 30 s per request (docs.gnani.ai/api/STT/speech-to-text).
+export const MAX_AUDIO_MS = 30_000;
 
 /** Reads the final OGG page granule position (48 kHz for Opus) to get duration without decoding. */
 export function oggOpusDurationMs(bytes: Uint8Array): number | null {

@@ -4,7 +4,7 @@ import { formatRupees } from "../money-words.js";
 export const SUPPORT = () => process.env.SUPPORT_CONTACT?.trim() || "apne shop administrator";
 export const msg = {
   unusableAudio: "Awaaz saaf nahi aayi. Aise bolein: 'Ramesh ko 500 ka udhaar likh do'.",
-  tooLong: "Voice note 60 second se lamba hai. Chhota voice note bhejein, ek entry ek baar.",
+  tooLong: "Voice note 30 second se lamba hai. Chhota voice note bhejein, ek entry ek baar.",
   invalidModel: "Samajh nahi aaya, kuch save nahi hua. Dobara bhejein.",
   systemError: "Abhi save nahi ho paya. Thodi der baad dobara bhejein.",
   busy: "Abhi samajh nahi paya, thodi der baad dobara bhejein. Kuch save nahi hua.",

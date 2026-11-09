@@ -24,7 +24,7 @@ test("OGG/Opus duration is read from the final granule position", () => assert.e
 test("valid WhatsApp voice note passes validation", () => assert.deepEqual(validateAudio(ogg(8000), "audio/ogg; codecs=opus"), { mime: "audio/ogg", durationMs: 8000 }));
 const rejects = (bytes: Uint8Array, mime: string, reason: string) =>
   assert.throws(() => validateAudio(bytes, mime), (e: unknown) => e instanceof UnusableAudio && e.reason === reason);
-test("audio over 60 seconds is rejected (3-minute note)", () => rejects(ogg(180_000), "audio/ogg", "too_long"));
+test("audio over 30 seconds is rejected (3-minute note)", () => rejects(ogg(180_000), "audio/ogg", "too_long"));
 test("empty audio is rejected", () => rejects(new Uint8Array(10), "audio/ogg", "empty"));
 test("corrupt OGG is rejected", () => rejects(new Uint8Array(500).fill(7), "audio/ogg", "corrupt"));
 test("unsupported formats are rejected", () => rejects(ogg(1000), "video/mp4", "unsupported_format"));

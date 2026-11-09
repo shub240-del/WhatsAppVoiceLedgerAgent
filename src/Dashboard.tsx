@@ -390,6 +390,19 @@ export default function Dashboard() {
       setBusy(false);
     }
   }
+  const [gnaniCheck, setGnaniCheck] = useState<"checking" | { ok: boolean; detail: string } | null>(null);
+  async function testGnani() {
+    if (!user) {
+      open("login");
+      return;
+    }
+    setGnaniCheck("checking");
+    try {
+      setGnaniCheck(await api<{ ok: boolean; detail: string }>("/api/integrations/gnani/verify", {}));
+    } catch (e) {
+      setGnaniCheck({ ok: false, detail: e instanceof Error ? e.message : "The check could not run." });
+    }
+  }
   async function checkConnection() {
     if (!user) {
       open("login");
@@ -1274,6 +1287,26 @@ export default function Dashboard() {
                   integrations && integrations.uid === user?.uid ? integrations.list : null
                 }
               />
+              <section className="panel settings-card">
+                <h2>Gnani voice-to-text</h2>
+                <p>
+                  Turns WhatsApp voice notes into text. The key lives only on the server
+                  (<code>GNANI_API_KEY</code> in Vercel). This test sends one second of silence.
+                </p>
+                <button
+                  className="button secondary small"
+                  onClick={() => void testGnani()}
+                  disabled={gnaniCheck === "checking"}
+                >
+                  {gnaniCheck === "checking" ? <LoaderCircle size={14} className="spin" /> : <AudioLines size={14} />}
+                  Test Gnani key
+                </button>
+                {gnaniCheck && gnaniCheck !== "checking" && (
+                  <p role="status" className={gnaniCheck.ok ? "form-success" : "form-error"}>
+                    {gnaniCheck.detail}
+                  </p>
+                )}
+              </section>
               <div className="policy-note">
                 <ShieldCheck size={23} />
                 <div>

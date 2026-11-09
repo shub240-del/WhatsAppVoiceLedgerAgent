@@ -7,6 +7,8 @@ import type { Auth } from "firebase-admin/auth";
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import { LedgerService } from "./ledger.js";
 import { OnboardingService } from "./onboarding.js";
+import { gnaniSttConfig } from "./gnani-config.js";
+import { verifyGnaniKey } from "./gnani-stt.js";
 import { ServiceError, ensure } from "./domain.js";
 import { reminderPolicy } from "./adapters.js";
 import { integrationStatuses, whatsappConfig } from "./config.js";
@@ -129,6 +131,14 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
   }));
   app.post("/api/entries/:id/edit", route(async (req, res) => {
     res.json(await ledger.editEntry(res.locals.uid, { ...req.body, entryId: String(req.params.id) }, req.get("Idempotency-Key")));
+  }));
+  // Live Gnani key check for the owner's Connections page. Sends 1 s of silence; never returns the key.
+  app.post("/api/integrations/gnani/verify", route(async (_req, res) => {
+    const owner = await store.doc(`owners/${res.locals.uid}`).get();
+    ensure(owner.exists && owner.get("active") === true, 403, "OWNER_REQUIRED", "Create your shop first.");
+    const { config, problems } = gnaniSttConfig(env);
+    if (!config) return res.json({ ok: false, reason: "not_configured", detail: problems.join(" ") });
+    res.json(await verifyGnaniKey(config));
   }));
   app.get("/api/connection", route(async (_req, res) => {
     const owner = await store.doc(`owners/${res.locals.uid}`).get();

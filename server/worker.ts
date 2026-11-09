@@ -8,6 +8,8 @@ import { JobQueue } from "./jobs.js";
 import { createHandlers } from "./handlers.js";
 import { runReminders } from "./reminders.js";
 import { log } from "./log.js";
+import { gnaniSttConfig } from "./gnani-config.js";
+import { GnaniSpeechToText } from "./gnani-stt.js";
 
 for (const s of integrationStatuses()) log("info", "integration_status", { provider: s.provider, state: s.state });
 const wa = whatsappConfig();
@@ -16,12 +18,14 @@ if (!wa.config) {
   process.exit(1);
 }
 const gemini = geminiConfig();
+const gnani = gnaniSttConfig();
+if (!gnani.config) log("warn", "stt_not_configured", { problems: gnani.problems.join(" ") });
 const whatsapp = new MetaWhatsAppClient(wa.config);
 const agent = new VoiceAgent({
   db: store,
   ledger: new LedgerService(store),
   parser: gemini.config ? new GeminiParser(gemini.config) : null,
-  stt: null, // PRISMA: blocked until documentation is supplied
+  stt: gnani.config ? new GnaniSpeechToText(gnani.config) : null,
   whatsapp,
 });
 const queue = new JobQueue(store);

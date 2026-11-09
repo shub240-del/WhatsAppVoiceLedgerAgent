@@ -104,9 +104,9 @@ test("integration classifier reports external providers honestly and never echoe
   const statuses = integrationStatuses(env);
   const state = (p: string) => statuses.find((s) => s.provider === p)?.state;
   assert.equal(state("gemini"), "INVALID"); // key without model
-  assert.equal(state("prisma"), "BLOCKED_EXTERNALLY");
-  assert.equal(state("timbre"), "BLOCKED_EXTERNALLY");
-  assert.equal(state("gnani"), "BLOCKED_EXTERNALLY");
+  assert.equal(state("prisma"), "CONFIGURED"); // Gnani Prisma STT via GNANI_API_KEY
+  assert.equal(state("timbre"), "NOT_CONFIGURED"); // voice replies not built yet
+  assert.equal(state("gnani"), "CONFIGURED");
   assert.equal(state("whatsapp"), "NOT_CONFIGURED");
   assert.equal(state("reminders"), "DISABLED_BY_POLICY");
   const text = JSON.stringify(statuses);

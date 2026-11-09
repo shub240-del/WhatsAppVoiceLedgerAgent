@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { connectAuthEmulator, getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 
 // Firebase web configuration is public; access is enforced by rules and verified ID tokens.
@@ -18,6 +18,18 @@ export const projectId = config.projectId;
 if (import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true") {
   connectAuthEmulator(auth, "http://127.0.0.1:9099");
   connectFirestoreEmulator(db, "127.0.0.1", 8181);
+}
+
+if (
+  import.meta.env.MODE === "test" &&
+  import.meta.env.VITE_AUTH_TEST_HELPER === "true" &&
+  import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true" &&
+  projectId.startsWith("demo-")
+) {
+  // Test-only sign-in supports emulator-backed browser journeys; production builds omit this branch.
+  window.__udhaarE2ESignIn = async (email, password) => {
+    await signInWithEmailAndPassword(auth, email, password);
+  };
 }
 
 // Analytics is deliberately not initialized: it is unnecessary for private financial records.

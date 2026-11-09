@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import express from "express";
 import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Server } from "node:http";
 import { initializeApp, deleteApp } from "firebase-admin/app";
@@ -8,7 +9,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { createApi } from "../../server/app";
 
-const DIST = "/tmp/udhaar-e2e-dist";
+const DIST = path.join(tmpdir(), "udhaar-e2e-dist");
 const ORIGIN = "http://127.0.0.1:3999";
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST)
   throw new Error("Run under the Firebase emulators.");
@@ -33,6 +34,11 @@ test.beforeAll(async () => {
     uid: "e2e-intruder",
     email: "intruder@e2e.test",
     password: "e2e-password-2",
+  });
+  await auth.createUser({
+    uid: "e2e-new-owner",
+    email: "meera@e2e.test",
+    password: "meera-password-1",
   });
   await db
     .doc("shops/e2e-shop")
@@ -66,11 +72,13 @@ async function openApp(page: Page) {
   await page.goto(`${ORIGIN}/#/workspace`);
 }
 async function login(page: Page, email: string, password: string) {
-  await page.getByRole("button", { name: "Sign in as owner" }).first().click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Email address").fill(email);
-  await dialog.getByLabel("Password", { exact: true }).fill(password);
-  await dialog.getByRole("button", { name: "Sign in securely" }).click();
+  await page.evaluate(async ({ email, password }) => {
+    const browser = globalThis as typeof globalThis & {
+      __udhaarE2ESignIn?: (email: string, password: string) => Promise<void>;
+    };
+    if (!browser.__udhaarE2ESignIn) throw new Error("E2E Auth emulator helper is missing.");
+    await browser.__udhaarE2ESignIn(email, password);
+  }, { email, password });
 }
 const balance = async () =>
   (await db.doc("shops/e2e-shop/customers/ramesh").get()).get("balancePaise");
@@ -119,7 +127,7 @@ test("owner signs in, records, edits and reverses entries; every number comes fr
   await dialog.getByRole("button", { name: "Edit details" }).click();
   await dialog.getByLabel(/Aliases/).fill("Pappu");
   await dialog.getByRole("button", { name: "Save details" }).click();
-  await expect(dialog.getByText("Customer details saved.")).toBeVisible();
+  await expect(dialog.getByText("Also known as: Pappu")).toBeVisible();
   expect((await db.doc("shops/e2e-shop/customers/ramesh").get()).get("aliases")).toEqual(["Pappu"]);
   await dialog.getByRole("button", { name: "Record opt-out" }).click();
   await expect(dialog.getByText("Opt-out recorded")).toBeVisible();
@@ -148,20 +156,22 @@ test("an authenticated user without shop membership sees no shop data", async ({
   await expect(page.getByText("Ramesh", { exact: true })).toHaveCount(0);
 });
 
-test("public sign-up creates an Auth account, guides trusted shop linking and completes the first entry", async ({
+test("new owner onboarding requires trusted shop linking before the first entry", async ({
   page,
   context,
 }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto(ORIGIN);
-  await page.getByRole("button", { name: "Get started", exact: true }).first().click();
+  await page.getByRole("button", { name: "Create account", exact: true }).first().click();
   let dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Your name").fill("Meera");
-  await dialog.getByLabel("Email address").fill("meera@e2e.test");
-  await dialog.getByLabel("Password", { exact: true }).fill("meera-password-1");
-  await dialog.getByLabel("Confirm password").fill("meera-password-1");
   await dialog.getByRole("checkbox").check();
-  await dialog.getByRole("button", { name: "Create owner account" }).click();
+  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
+  await expect(dialog.getByLabel("Email address")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await openApp(page);
+  await login(page, "meera@e2e.test", "meera-password-1");
+  await expect(page.getByRole("alert").filter({ hasText: "owner membership is not provisioned" })).toBeVisible();
+  await page.locator(".error-banner").getByRole("button", { name: "Open setup guide" }).click();
   await expect(page.getByRole("dialog", { name: "Let’s open your khata." })).toBeVisible();
   dialog = page.getByRole("dialog");
   const user = await auth.getUserByEmail("meera@e2e.test");
@@ -221,7 +231,13 @@ test("mobile owner navigation, customer details, validation and sign-out remain 
   await dialog.getByRole("button", { name: "Close dialog" }).click();
   await page.getByRole("button", { name: "Open navigation" }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.reload();
+  await expect(page.getByText("Sharma Kirana").first()).toBeVisible();
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Sign out securely" }).click();
+  await expect(page.getByRole("button", { name: "Sign in as owner" }).first()).toBeVisible();
+  await page.reload();
   await expect(page.getByRole("button", { name: "Sign in as owner" }).first()).toBeVisible();
   await expect(page.getByText("owner@e2e.test", { exact: true })).toHaveCount(0);
 });

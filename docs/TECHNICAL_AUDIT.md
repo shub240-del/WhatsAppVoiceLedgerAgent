@@ -109,3 +109,19 @@ reminder, or end-to-end tests.
 8. Reminder engine with policy gate (sending disabled), UPI, TTS contract.
 9. Dashboard: customer detail/edit/aliases, history, edit entry, audit log, reminders.
 10. Config validation, `.env.example`, docs, ≥100 meaningful tests.
+
+## B. Google Authentication update (9 Nov 2026)
+
+- The frontend now starts Firebase Google sign-in with redirect, explicitly persists
+  the session locally, and consumes the redirect result on app startup.
+- New Google identities are routed to the existing trusted shop-linking guide;
+  existing users continue to the workspace. Shop access still requires an active
+  owner membership.
+- Email/Password remains intentionally disabled and is not required by the app.
+- The Google provider and local browser origins were accepted by the live Identity
+  Toolkit sign-in endpoint. A full interactive Google account sign-in and the
+  deployed site's authorized-domain/OAuth client settings require browser/operator
+  verification.
+- Backend routes call Firebase Admin `verifyIdToken(token, true)`. Emulator-backed
+  API tests verify valid, invalid and revoked tokens. Live Admin verification
+  remains blocked until server ADC or `GOOGLE_APPLICATION_CREDENTIALS` is supplied.

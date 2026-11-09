@@ -11,8 +11,9 @@ test("private workspace, navigation, login dialog and honest integration states"
   await page.getByRole("button", { name: "Add entry", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Welcome to your khata." })).toBeVisible();
-  await expect(dialog.getByLabel("Email address")).toBeVisible();
-  await expect(dialog.getByLabel("Password", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  await expect(dialog.getByLabel("Email address")).toHaveCount(0);
+  await expect(dialog.getByLabel("Password")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
   await page.getByRole("button", { name: "Explore voice commands" }).click();

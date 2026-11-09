@@ -1,6 +1,9 @@
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, AudioLines, LoaderCircle, RefreshCw } from "lucide-react";
 import { LandingPage } from "./components/LandingPage";
+import { resolveGoogleRedirectResult } from "./lib/google-auth";
+import { authErrorMessage } from "./lib/auth-errors";
+import { getAdditionalUserInfo } from "firebase/auth";
 
 const Dashboard = lazy(() => import("./Dashboard"));
 const AuthDialog = lazy(() =>
@@ -39,6 +42,23 @@ class ExperienceBoundary extends Component<{ children: ReactNode }, { failed: bo
 export default function App() {
   const [workspace, setWorkspace] = useState(isWorkspace);
   const [authMode, setAuthMode] = useState<"login" | "signup" | null>(null);
+  const [authRedirectError, setAuthRedirectError] = useState("");
+  useEffect(() => {
+    let active = true;
+    void resolveGoogleRedirectResult()
+      .then((credential) => {
+        if (!active || !credential) return;
+        setAuthMode(null);
+        const newUser = getAdditionalUserInfo(credential)?.isNewUser;
+        window.location.hash = newUser ? "/workspace?setup=1" : "/workspace";
+      })
+      .catch((error: unknown) => {
+        if (active) setAuthRedirectError(authErrorMessage(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
   useEffect(() => {
     const onHashChange = () => {
       const next = isWorkspace();
@@ -54,6 +74,18 @@ export default function App() {
   }, [workspace]);
   return (
     <ExperienceBoundary>
+      {authRedirectError && (
+        <div className="auth-redirect-error" role="alert">
+          <span>{authRedirectError}</span>
+          <button
+            className="text-button"
+            onClick={() => setAuthRedirectError("")}
+            aria-label="Dismiss sign-in error"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {workspace ? (
         <Suspense
           fallback={
@@ -81,10 +113,6 @@ export default function App() {
             mode={authMode}
             onModeChange={setAuthMode}
             close={() => setAuthMode(null)}
-            done={(isNew) => {
-              setAuthMode(null);
-              window.location.hash = isNew ? "/workspace?setup=1" : "/workspace";
-            }}
           />
         </Suspense>
       )}

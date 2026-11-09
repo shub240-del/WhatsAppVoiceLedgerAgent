@@ -1446,6 +1446,44 @@ code {
   font-size: 10px;
   line-height: 1.8;
 }
+.google-signin {
+  gap: 10px;
+  margin-top: 16px;
+  color: #263d36;
+  background: #fff;
+  border-color: #d7dfd9;
+}
+.google-signin:hover:not(:disabled) {
+  background: #f7faf8;
+  border-color: #aab9ae;
+}
+.google-signin svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+.auth-redirect-error {
+  position: fixed;
+  z-index: 1000;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid #e7c7b9;
+  border-radius: 8px;
+  background: #fff8f4;
+  color: #743d2c;
+  box-shadow: 0 8px 30px #152c241c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.auth-redirect-error .text-button {
+  flex: 0 0 auto;
+  color: #743d2c;
+}
 .form-note svg {
   flex-shrink: 0;
   margin-top: 2px;

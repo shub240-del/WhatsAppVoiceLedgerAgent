@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import {
   BellRing,
   History,
@@ -41,6 +41,8 @@ import {
   Store,
 } from "lucide-react";
 import { auth, projectId } from "./lib/firebase";
+import { beginGoogleSignIn } from "./lib/google-auth";
+import { GoogleSignInButton } from "./components/GoogleSignInButton";
 import { api } from "./lib/api";
 import { money, rupeesToPaise } from "./lib/money";
 import { useWorkspace, type Entry } from "./lib/useWorkspace";
@@ -116,6 +118,12 @@ export default function Dashboard() {
   const operation = useRef<{ payload: string; key: string } | null>(null);
   const now = new Date();
   useEffect(() => {
+    if (!user) return;
+    setDialog(null);
+    setBusy(false);
+    setError("");
+  }, [user]);
+  useEffect(() => {
     const syncTab = () => {
       setTab(tabFromHash());
       setSearch("");
@@ -182,39 +190,13 @@ export default function Dashboard() {
       operation.current = { payload: serialized, key: crypto.randomUUID() };
     return operation.current.key;
   }
-  async function submitLogin(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    const data = new FormData(e.currentTarget);
-    try {
-      await signInWithEmailAndPassword(
-        auth,
-        String(data.get("email")),
-        String(data.get("password")),
-      );
-      setDialog(null);
-      notify("Signed in. Your shop is being verified.");
-    } catch (e) {
-      setError(authErrorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function resetPassword() {
-    const email = (document.querySelector("#owner-email") as HTMLInputElement | null)?.value;
-    if (!email) {
-      setError("Enter your email address first.");
-      return;
-    }
+  async function submitLogin() {
     setBusy(true);
     setError("");
     try {
-      await sendPasswordResetEmail(auth, email);
-      notify("If this account exists, a password reset email will be sent.");
+      await beginGoogleSignIn();
     } catch (e) {
       setError(authErrorMessage(e));
-    } finally {
       setBusy(false);
     }
   }
@@ -1155,7 +1137,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <small>AUTHENTICATION</small>
-                    <strong>{user ? "Signed in" : "Email & password · not verified"}</strong>
+                    <strong>{user ? "Google account signed in" : "Not signed in"}</strong>
                   </div>
                   <div>
                     <small>CLOUD FIRESTORE</small>
@@ -1319,54 +1301,18 @@ export default function Dashboard() {
           eyebrow="OWNER SIGN-IN"
           close={() => !busy && setDialog(null)}
         >
-          <p className="modal-description">
-            Sign in with the owner account linked to your shop. Your records are visible only to
-            you.
-          </p>
-          <form onSubmit={submitLogin} className="form">
-            <label>
-              Email address
-              <input
-                id="owner-email"
-                name="email"
-                type="email"
-                autoComplete="username"
-                placeholder="you@yourshop.com"
-                required
-              />
-            </label>
-            <label>
-              Password
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="Your password"
-                required
-              />
-            </label>
-            <button
-              className="text-button reset-password"
-              type="button"
-              disabled={busy}
-              onClick={resetPassword}
-            >
-              Forgot password?
-            </button>
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-            <button className="button primary full" disabled={busy}>
-              {busy ? <LoaderCircle size={17} className="spin" /> : <LockKeyhole size={15} />}Sign
-              in securely
-            </button>
+          <div className="form">
+            <p className="modal-description">
+              Continue with the Google account linked to your shop. Your records are visible only
+              after your owner membership is verified.
+            </p>
+            {error && <p className="form-error" role="alert">{error}</p>}
+            <GoogleSignInButton busy={busy} onClick={() => void submitLogin()} />
             <div className="form-note">
               <ShieldCheck size={15} />
               Protected by Firebase Authentication. Access requires verified shop membership.
             </div>
-          </form>
+          </div>
         </Modal>
       )}
       {dialog === "customer" && (
@@ -1577,8 +1523,8 @@ export default function Dashboard() {
             </p>
             <h3>Can’t access your shop?</h3>
             <p>
-              Ask your project administrator to enable Email/Password in Firebase Authentication,
-              create your account, and provision its shop membership. See{" "}
+              Sign in with the Google account linked to your shop. Ask your project administrator
+              to provision or restore its shop membership. See{" "}
               <code>docs/FIREBASE_SETUP.md</code>.
             </p>
             <h3>Need human help?</h3>

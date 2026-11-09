@@ -69,27 +69,21 @@ test("FAQ, privacy, pilot terms and workspace preview controls work", async ({ p
   await expect(page.getByRole("heading", { name: "Your khata, at a glance." })).toBeVisible();
 });
 
-test("get started opens sign-up, validates password confirmation, and switches to login", async ({
+test("get started offers Google sign-in and explains owner provisioning", async ({
   page,
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create account", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Your name").fill("Shop Owner");
-  await dialog.getByLabel("Email address").fill("owner@example.test");
-  await dialog.getByLabel("Password", { exact: true }).fill("long-password-1");
-  await dialog.getByLabel("Confirm password").fill("different-password");
+  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeDisabled();
   await dialog.getByRole("checkbox").check();
-  await dialog.getByRole("button", { name: "Create owner account" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText(
-    "The passwords don’t match. Please check both fields.",
-  );
-  await dialog.getByRole("button", { name: "Show password", exact: true }).click();
-  await expect(dialog.getByLabel("Password", { exact: true })).toHaveAttribute("type", "text");
+  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
+  await expect(dialog.getByText(/administrator will securely link your shop/i)).toBeVisible();
+  await expect(dialog.getByLabel("Email address")).toHaveCount(0);
+  await expect(dialog.getByLabel("Password")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(dialog.getByRole("heading", { name: "Welcome back to your khata." })).toBeVisible();
-  await dialog.getByRole("button", { name: "Forgot password?" }).click();
-  await expect(dialog.getByRole("alert")).toHaveText("Enter your valid email address above first.");
+  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeVisible();
 });
 
 test("hero demo link and login, signup, and footer actions reach their working destinations", async ({

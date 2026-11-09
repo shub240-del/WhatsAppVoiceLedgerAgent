@@ -20,9 +20,10 @@ have been configured in the console.
 
 - [ ] Select the intended Firebase project, currently `udhar-khata-f41fb`.
 - [ ] Remain on the Spark plan. Do not upgrade or enable billing without approval.
-- [ ] Authentication → Sign-in method → enable **Email/Password**.
-- [ ] Authentication → Settings → Authorized domains → add the exact preview/production host.
-- [ ] Authentication → Users → create the owner account and give the owner a secure password-reset path.
+- [x] Authentication → Sign-in method → **Google** provider enabled for project `udhar-khata-f41fb`.
+- [ ] Authentication → Settings → Authorized domains → confirm the exact preview/production host.
+  The live SDK redirect accepts `localhost`; `127.0.0.1` is rejected, so use `localhost` for local sign-in.
+- [ ] Sign in with the owner's Google account, then provision that Auth UID to a shop.
 - [ ] Create Cloud Firestore in **production mode**, choose its region deliberately, and review residency/privacy needs.
 - [ ] Review and publish `firestore.rules`. Never use test-mode public access rules.
 - [ ] Create the indexes in `firestore.indexes.json`.
@@ -32,9 +33,9 @@ have been configured in the console.
 - [ ] Configure the frontend API URL and exact allowed origin.
 - [ ] Configure a real human support contact before any WhatsApp launch.
 
-Phone OTP is **not implemented or enabled**. Email/password avoids inventing an OTP provider;
-phone auth, SMS costs and abuse protection need a separate decision.
-There is no public signup-to-shop flow and no client ability to choose its tenant.
+Email/Password is intentionally disabled; the frontend uses Google sign-in. Phone OTP is
+**not implemented or enabled**. There is no public signup-to-shop flow and no client ability
+to choose its tenant.
 
 ## 2. Environment variables
 
@@ -224,7 +225,7 @@ with that same demo project and `VITE_USE_FIREBASE_EMULATORS=true`.
 Live connection checks (read-only except login session):
 
 1. Open preview and choose **Sign in as owner**.
-2. Authenticate using the provisioned owner email/password.
+2. Authenticate using the provisioned owner's Google account.
 3. Confirm the shop name appears and real Firestore data loads (empty is valid).
 4. Connections → **Verify API connection** checks the separate authenticated API.
 5. Repeat with a second shop and verify the emulator tests before trusting isolation.

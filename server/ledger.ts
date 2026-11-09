@@ -45,7 +45,10 @@ function matchingFields(name: string, aliases: string[]) {
 const validKey = (key?: string): key is string => Boolean(key && /^[a-zA-Z0-9_-]{8,128}$/.test(key));
 
 export class LedgerService {
-  constructor(private db: Firestore) {}
+  private now: () => number;
+  constructor(private db: Firestore, options: { now?: () => number } = {}) {
+    this.now = options.now ?? Date.now;
+  }
 
   async createCustomer(uid: string, input: unknown, key?: string) {
     const data = z
@@ -173,7 +176,7 @@ export class LedgerService {
         const recent = await tx.get(
           entries
             .where("createdBy", "==", uid)
-            .where("createdAt", ">=", Timestamp.fromMillis(Date.now() - 600_000))
+            .where("createdAt", ">=", Timestamp.fromMillis(this.now() - 600_000))
             .orderBy("createdAt", "desc")
             .limit(101),
         );
@@ -188,7 +191,7 @@ export class LedgerService {
         for (const row of rows.filter((r) => r.type !== "reversal")) {
           if ((await tx.get(reversals.doc(row.id))).exists) reversedIds.add(row.id);
         }
-        original = selectUndo(rows, reversedIds, Date.now());
+        original = selectUndo(rows, reversedIds, this.now());
       } else if (action.action === "undo_entry") {
         const snapshot = await tx.get(entries.doc(action.entryId));
         ensure(snapshot.exists, 404, "ENTRY_NOT_FOUND", "Entry not found in this shop.");

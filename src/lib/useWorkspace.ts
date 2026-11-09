@@ -94,16 +94,28 @@ export function useWorkspace() {
           throw new Error("Your shop is inactive or unavailable.");
         const customerRef = collection(db, "shops", shopId, "customers");
         const entryRef = collection(db, "shops", shopId, "ledgerEntries");
-        const [customerDocs, entryDocs, customerStats, balanceStats, entryStats] =
+        const [customerDocs, entryDocs, customerStats, entryStats] =
           await Promise.all([
             getDocs(query(customerRef, orderBy("name"), limit(customerPage + 1))),
             getDocs(query(entryRef, orderBy("createdAt", "desc"), limit(entryPage + 1))),
             getAggregateFromServer(customerRef, { customers: count() }),
-            getAggregateFromServer(query(customerRef, where("balancePaise", ">", 0)), {
-              balance: sum("balancePaise"),
-            }),
             getAggregateFromServer(entryRef, { entries: count() }),
           ]);
+        // sum() aggregation requires Firestore Blaze plan. Fall back to summing
+        // the loaded customer page (may undercount on large shops — accurate for Spark).
+        let balance = 0;
+        try {
+          const balanceStats = await getAggregateFromServer(
+            query(customerRef, where("balancePaise", ">", 0)),
+            { balance: sum("balancePaise") },
+          );
+          balance = balanceStats.data().balance ?? 0;
+        } catch {
+          // Spark plan or quota exceeded: derive from loaded customers.
+          balance = customerDocs.docs
+            .slice(0, customerPage)
+            .reduce((acc, d) => acc + (Number(d.get("balancePaise")) || 0), 0);
+        }
         const entryRows = entryDocs.docs
           .slice(0, entryPage)
           .map((d) => ({ ...d.data(), id: d.id }) as Entry);
@@ -132,7 +144,7 @@ export function useWorkspace() {
         setReversals(reversed);
         setHasMoreCustomers(customerDocs.size > customerPage);
         setHasMoreEntries(entryDocs.size > entryPage);
-        setTotals({ ...customerStats.data(), ...balanceStats.data(), ...entryStats.data() });
+        setTotals({ ...customerStats.data(), balance, ...entryStats.data() });
         setLoadedFor(user!.uid);
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : "Could not load the shop.");

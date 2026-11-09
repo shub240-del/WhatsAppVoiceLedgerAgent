@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@google/genai": "^3.0.0",
+    "@vercel/functions": "3.11.1",
     "cors": "^2.8.6",
     "express": "^5.3.0",
     "firebase": "^13.2.0",

@@ -14,6 +14,7 @@ import { reminderPolicy } from "./adapters.js";
 import { integrationStatuses, whatsappConfig } from "./config.js";
 import { ingestWebhook, verifySignature } from "./whatsapp/webhook.js";
 import { log } from "./log.js";
+import { drainQueue, type Runtime } from "./runtime.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
 const safeEqual = (a: string, b: string) => {
@@ -21,7 +22,17 @@ const safeEqual = (a: string, b: string) => {
   return x.length === y.length && timingSafeEqual(x, y);
 };
 
-export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: string, options: { env?: Env; now?: () => number } = {}) {
+export type ApiOptions = {
+  env?: Env;
+  now?: () => number;
+  /**
+   * Serverless hosts (Vercel) never run the long-lived worker. When provided, queued voice jobs are
+   * processed right after Meta gets its 200, via the host's waitUntil. Without it, the worker does it.
+   */
+  background?: { schedule(task: Promise<unknown>): void; runtime(): Runtime | null; budgetMs?: number };
+};
+
+export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: string, options: ApiOptions = {}) {
   const env = options.env ?? process.env;
   const now = options.now ?? Date.now;
   const app = express();
@@ -67,7 +78,10 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
       const result = await ingestWebhook(store, payload, now());
       await event.update({ processedAt: Timestamp.fromMillis(now()), result });
       log("info", "webhook_ingested", { requestId: res.locals.requestId, ...result });
-      return res.status(200).json({ received: true });
+      res.status(200).json({ received: true });
+      // Status-only webhooks (sent/delivered/read) also sweep anything left over from earlier runs.
+      if (options.background) scheduleDrain(options.background, res.locals.requestId);
+      return;
     } catch (error) {
       log("error", "webhook_ingest_failed", { requestId: res.locals.requestId, error: error instanceof Error ? error.name : "UnknownError" });
       return res.sendStatus(500); // Meta retries; dedupe makes the retry safe
@@ -156,4 +170,16 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
     res.status(500).json({ error: { code: "INTERNAL", message: "The operation could not be completed. Retry using the same request key." } });
   });
   return app;
+}
+
+function scheduleDrain(background: NonNullable<ApiOptions["background"]>, requestId: string) {
+  const task = (async () => {
+    const runtime = background.runtime();
+    if (!runtime) return;
+    const result = await drainQueue(runtime, { budgetMs: background.budgetMs ?? 45_000 });
+    if (result.done || result.retried || result.dead) log("info", "queue_drained", { requestId, ...result });
+  })().catch((error) => {
+    log("error", "queue_drain_failed", { requestId, error: error instanceof Error ? error.name : "UnknownError" });
+  });
+  background.schedule(task);
 }

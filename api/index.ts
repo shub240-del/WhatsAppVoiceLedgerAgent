@@ -2,6 +2,7 @@
 // WhatsApp webhook (/webhooks/whatsapp) on the same domain as the frontend.
 // Required Vercel env: FIREBASE_SERVICE_ACCOUNT (service-account JSON). Optional: ALLOWED_ORIGIN.
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { waitUntil } from "@vercel/functions";
 
 type Handler = (req: IncomingMessage, res: ServerResponse) => void;
 let handler: Promise<Handler> | undefined;
@@ -13,11 +14,20 @@ function allowedOrigin() {
 }
 
 async function load(): Promise<Handler> {
-  const [{ createApi }, { adminAuth, store }] = await Promise.all([
+  const [{ createApi }, { adminAuth, store }, { createRuntime }] = await Promise.all([
     import("../server/app.js"),
     import("../server/admin.js"),
+    import("../server/runtime.js"),
   ]);
-  return createApi(store, adminAuth, allowedOrigin()) as unknown as Handler;
+  let runtime: ReturnType<typeof createRuntime> | undefined;
+  return createApi(store, adminAuth, allowedOrigin(), {
+    // No worker process on Vercel: voice jobs run right after Meta gets its 200 response.
+    background: {
+      schedule: (task) => waitUntil(task),
+      runtime: () => (runtime ??= createRuntime(store)),
+      budgetMs: 45_000,
+    },
+  }) as unknown as Handler;
 }
 
 export default async function api(req: IncomingMessage, res: ServerResponse) {

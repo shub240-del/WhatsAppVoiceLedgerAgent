@@ -1,15 +1,9 @@
 import { store } from "./admin.js";
-import { LedgerService } from "./ledger.js";
-import { geminiConfig, integrationStatuses, whatsappConfig } from "./config.js";
-import { GeminiParser } from "./agent/gemini.js";
-import { VoiceAgent } from "./agent/voice-agent.js";
-import { MetaWhatsAppClient } from "./whatsapp/client.js";
-import { JobQueue } from "./jobs.js";
-import { createHandlers } from "./handlers.js";
+import { integrationStatuses, whatsappConfig } from "./config.js";
+import { createRuntime } from "./runtime.js";
 import { runReminders } from "./reminders.js";
 import { log } from "./log.js";
 import { gnaniSttConfig } from "./gnani-config.js";
-import { GnaniSpeechToText } from "./gnani-stt.js";
 
 for (const s of integrationStatuses()) log("info", "integration_status", { provider: s.provider, state: s.state });
 const wa = whatsappConfig();
@@ -17,19 +11,10 @@ if (!wa.config) {
   log("error", "worker_not_started", { reason: "WhatsApp configuration is required to reply to owners." });
   process.exit(1);
 }
-const gemini = geminiConfig();
+const runtime = createRuntime(store)!;
 const gnani = gnaniSttConfig();
 if (!gnani.config) log("warn", "stt_not_configured", { problems: gnani.problems.join(" ") });
-const whatsapp = new MetaWhatsAppClient(wa.config);
-const agent = new VoiceAgent({
-  db: store,
-  ledger: new LedgerService(store),
-  parser: gemini.config ? new GeminiParser(gemini.config) : null,
-  stt: gnani.config ? new GnaniSpeechToText(gnani.config) : null,
-  whatsapp,
-});
-const queue = new JobQueue(store);
-const { handler, onDead } = createHandlers(store, agent, whatsapp);
+const { queue, handler, onDead } = runtime;
 let stopping = false;
 process.on("SIGTERM", () => { stopping = true; });
 process.on("SIGINT", () => { stopping = true; });

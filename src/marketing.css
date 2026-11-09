@@ -2270,8 +2270,8 @@
   }
   .site-hero {
     grid-template-columns: 1fr;
-    gap: 49px;
-    padding-block: 46px 50px;
+    gap: 28px;
+    padding-block: 30px 42px;
   }
   .hero-copy {
     text-align: center;
@@ -2280,33 +2280,38 @@
     justify-content: center;
     font-size: 6.5px;
     letter-spacing: 1.4px;
-    margin-bottom: 21px;
+    margin-bottom: 16px;
   }
   .hero-copy h1 {
-    font-size: clamp(55px, 11.5vw, 71px);
-    letter-spacing: -3.5px;
+    font-size: clamp(48px, 12vw, 60px);
+    letter-spacing: -3px;
   }
   .hero-copy h1 em {
-    letter-spacing: -2.9px;
+    letter-spacing: -2.5px;
   }
   .hero-description {
-    font-size: 16px;
-    margin-top: 22px;
+    font-size: 15px;
+    margin-top: 16px;
   }
   .hero-explainer {
-    font-size: 11px;
+    font-size: 10px;
+    width: 100%;
     max-width: 330px;
-    margin: 13px auto 0;
+    margin: 10px auto 0;
   }
   .hero-ctas {
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    margin-top: 23px;
-    gap: 23px;
+    margin-top: 18px;
+    gap: 12px;
   }
   .hero-ctas .site-button {
+    width: min(100%, 280px);
     font-size: 11px;
     padding: 12px 20px;
     min-height: 44px;
+    justify-content: center;
     gap: 15px;
   }
   .site-watch {
@@ -2315,7 +2320,7 @@
   .hero-assurance {
     justify-content: center;
     font-size: 8px;
-    margin-top: 21px;
+    margin-top: 15px;
   }
   .hero-product {
     min-height: 420px;

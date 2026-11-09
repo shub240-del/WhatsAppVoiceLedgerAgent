@@ -38,36 +38,36 @@ const links = [
 ];
 const faqs = [
   [
-    "What can I use today?",
-    "The owner dashboard supports customer records, credits, payments, balances, full ledger history, and reason-required corrections. Access requires a Firebase owner account, a linked shop, and a configured secure API.",
+    "What can I do with Udhaar?",
+    "Keep customer names, credit, payments, balances, and entry history together in your shop dashboard. You’ll need an owner account and a shop linked through pilot onboarding.",
   ],
   [
-    "Does the WhatsApp voice agent work yet?",
-    "The voice-first workflow is implemented and tested locally, but live WhatsApp, speech-to-text, and Gemini access require provider setup and verification. The examples on this website are interactive illustrations, not live AI responses.",
+    "Can I add entries by WhatsApp voice today?",
+    "Not yet. The voice examples here are demos. Live WhatsApp voice needs provider setup and testing before it can be offered.",
   ],
   [
-    "How do I get my shop set up?",
-    "Choose Get started to create your owner account. During the pilot, an onboarding administrator securely provisions and links your shop. The setup guide gives you your owner ID and lets you check when access is ready.",
+    "How do I get started?",
+    "Choose Create account to sign up. During the pilot, an onboarding administrator links your shop. The setup guide shows your next step.",
   ],
   [
-    "How are my customers and their balances organized?",
-    "Keep each customer’s name, optional familiar landmark or alias, current balance, and ledger history together in your shop workspace.",
+    "How do I find a customer’s balance?",
+    "Open a customer in your dashboard to see their balance and past entries. Add a familiar landmark to tell customers with similar names apart.",
   ],
   [
-    "What happens if I enter the wrong amount?",
-    "You can reverse an entry with a reason, or correct it by creating a linked reversal and replacement. The original stays visible, so you have a clear record of what changed and why.",
+    "What if I enter the wrong amount?",
+    "Correct the entry with a reason. The original stays in the history, so you can see what changed.",
   ],
   [
-    "Can other shop owners see my customers?",
-    "Access is designed around one authenticated owner and one shop. The API derives the shop from trusted membership, and Firestore rules deny cross-shop reads and direct financial writes. Production rules must be published before a live rollout.",
+    "Can another shop see my records?",
+    "Each owner account is linked to a shop, and access controls are designed to keep shop records separate. Ask your onboarding administrator about your pilot’s setup.",
   ],
   [
-    "Will my customers get automatic payment reminders?",
-    "No. Outbound customer reminders are disabled by policy. They will not be enabled without written Meta/BSP approval, appropriate consent, and a separate reviewed release.",
+    "Will Udhaar message my customers?",
+    "No. Automatic customer reminders are not available. Adding a phone number does not sign a customer up for messages.",
   ],
   [
-    "Do you collect payments or access my bank account?",
-    "No. Udhaar keeps records; it does not hold funds or connect to your bank account. A recorded payment changes the ledger only when the owner submits it. Opening a UPI link is not proof of payment.",
+    "Can I pay or connect my bank through Udhaar?",
+    "No. Udhaar keeps shop records; it does not hold money or connect to your bank. You record a payment after you receive it.",
   ],
 ];
 
@@ -103,7 +103,7 @@ function HeroConversation() {
       <div className="hero-orbit orbit-outer" />
       <div className="hero-orbit orbit-inner" />
       <div className="hero-product-label">
-        <span />A LITTLE PREVIEW OF A SIMPLER DAY
+        <span />A QUICK LOOK AT YOUR KHATA
       </div>
       <div className="hero-chat">
         <div className="hero-chat-head">
@@ -112,12 +112,12 @@ function HeroConversation() {
           </span>
           <div>
             <strong>Udhaar assistant</strong>
-            <small>Your shop’s private khata</small>
+            <small>Your shop’s khata</small>
           </div>
           <span className="hero-chat-sample">EXAMPLE</span>
         </div>
         <div className="hero-chat-body">
-          <span className="chat-day">A day at your shop</span>
+          <span className="chat-day">Example entry</span>
           <div className="hero-audio">
             <span className="audio-play">
               <Play size={16} fill="currentColor" />
@@ -127,33 +127,33 @@ function HeroConversation() {
             <CheckCheck size={15} />
           </div>
           <div className="hero-transcript">
-            <span>YOU SAY</span>
+            <span>VOICE MESSAGE</span>
             <p>
               “Ramesh ko 340 rupaye
               <br />
               ka udhaar likh do.”
             </p>
-            <small>One voice note. One clear entry.</small>
+            <small>“Add ₹340 credit for Ramesh.”</small>
           </div>
           <div className="hero-reply">
             <span className="reply-check">
               <Check size={16} />
             </span>
             <div>
-              <strong>Samajh gaya.</strong>
+              <strong>Entry understood</strong>
               <p>
-                Ramesh ji ke khate mein ₹340 add.
+                ₹340 credit added for Ramesh.
                 <br />
-                Ab total baaki <b>₹1,260.</b>
+                New balance: <b>₹1,260.</b>
               </p>
-              <small>Galti ho toh “GALAT” likhein.</small>
+              <small>Example only. Review before saving.</small>
             </div>
             <CheckCheck className="chat-checks" size={14} />
           </div>
         </div>
         <div className="hero-chat-foot">
           <LockKeyhole size={12} />
-          <span>Illustrative example · Live setup required</span>
+          <span>Example only · Not a live entry</span>
         </div>
       </div>
       <div className="hero-float">
@@ -161,8 +161,8 @@ function HeroConversation() {
           <ShieldCheck size={19} />
         </span>
         <div>
-          <strong>Every rupee, accounted for.</strong>
-          <small>Clear records. Complete history.</small>
+          <strong>Know what’s outstanding.</strong>
+          <small>See each customer’s entry history.</small>
         </div>
       </div>
       <div className="hero-written-note">
@@ -191,7 +191,7 @@ const examples = [
     action: "Credit given",
     text: "Ramesh ko 340 rupaye ka udhaar likh do.",
     amount: "₹340",
-    result: "Ramesh ji ke account mein ₹340 add kiye gaye. Ab total baaki ₹1,260 hai.",
+    result: "₹340 credit added for Ramesh. The example balance is now ₹1,260.",
     balance: "₹920 + ₹340 = ₹1,260",
     icon: ArrowUpRight,
   },
@@ -200,7 +200,7 @@ const examples = [
     action: "Payment received",
     text: "Ramesh ne 200 rupaye diye.",
     amount: "₹200",
-    result: "Ramesh ji se ₹200 mile. Ab baaki ₹720 hai.",
+    result: "₹200 payment recorded for Ramesh. The example balance is now ₹720.",
     balance: "₹920 − ₹200 = ₹720",
     icon: ArrowDownLeft,
   },
@@ -209,7 +209,7 @@ const examples = [
     action: "Balance query",
     text: "Ramesh ka kitna baaki hai?",
     amount: "Read only",
-    result: "Ramesh ji ka baaki ₹920 hai. Saath mein pichli entries ka hisaab.",
+    result: "Ramesh’s example balance is ₹920. No entry is added.",
     balance: "₹920 · no ledger change",
     icon: Wallet,
   },
@@ -240,7 +240,7 @@ function VoiceDemo() {
         <div className="demo-speech">
           <span className="site-kicker">
             <Mic size={14} />
-            01 / THE WORDS YOU SAY
+            01 / SAY IT YOUR WAY
           </span>
           <blockquote>“{example.text}”</blockquote>
           <div className="demo-wave">
@@ -256,28 +256,28 @@ function VoiceDemo() {
           >
             {stage === 2 ? <RefreshCw size={15} /> : <Play size={14} />}
             {stage === 0
-              ? "Try this example"
+              ? "Show this example"
               : stage === 1
-                ? "Show example confirmation"
-                : "Replay example"}
+                ? "Review this entry"
+                : "Start again"}
             <ArrowRight size={16} />
           </button>
         </div>
         <div className="demo-outcome" aria-live="polite">
           <span className="site-kicker">
             {stage === 0
-              ? "02 / A CLEARER PICTURE"
+              ? "02 / WHAT UDHAAR PICKS UP"
               : stage === 1
-                ? "02 / CHECK BEFORE YOU COUNT"
-                : "03 / AN EXACT CONFIRMATION"}
+                ? "02 / CHECK THE DETAILS"
+                : "03 / SEE THE RESULT"}
           </span>
           {stage === 0 ? (
             <div className="demo-waiting">
               <AudioLines size={40} strokeWidth={1.3} />
-              <h3>Your words. A clear next step.</h3>
+              <h3>Say it. Check it. Record it.</h3>
               <p>
-                Try an example to see how the workflow is designed to turn a simple sentence into a
-                checked entry.
+                Choose an example to see how a voice entry could look. Nothing here changes a real
+                khata.
               </p>
             </div>
           ) : stage === 1 ? (
@@ -296,7 +296,7 @@ function VoiceDemo() {
               </div>
               <p>
                 <ShieldCheck size={15} />
-                If a name or amount is unclear, ask. Never guess.
+                Check the name and amount before saving.
               </p>
             </div>
           ) : (
@@ -304,17 +304,17 @@ function VoiceDemo() {
               <span>
                 <Check size={24} />
               </span>
-              <h3>Clear words. Clear hisaab.</h3>
+              <h3>Here’s what would be recorded.</h3>
               <p>{example.result}</p>
               <div>{example.balance}</div>
-              <small>Example confirmation—not a saved transaction.</small>
+              <small>Example only. No transaction was saved.</small>
             </div>
           )}
         </div>
       </div>
       <p className="demo-disclosure">
         <CircleCheck size={13} />
-        Interactive illustration only. Nothing is sent to WhatsApp or written to a ledger.
+        Demo only. Nothing is sent to WhatsApp or added to a real khata.
       </p>
     </div>
   );
@@ -333,7 +333,7 @@ function DashboardPreview() {
         <span />
         <div>
           <LockKeyhole size={10} />
-          Your private Udhaar workspace
+          Udhaar dashboard preview
         </div>
         <span className="preview-label">INTERFACE PREVIEW</span>
       </div>
@@ -360,12 +360,12 @@ function DashboardPreview() {
           ))}
           <div className="preview-aside-note">
             <ShieldCheck size={21} />
-            <strong>Your khata, protected.</strong>
-            <small>One shop. One private space.</small>
+            <strong>Your shop’s records.</strong>
+            <small>Only linked shop data appears here.</small>
           </div>
         </aside>
         <div className="preview-main">
-          <span className="site-kicker">EVERYTHING IN ITS RIGHT PLACE</span>
+          <span className="site-kicker">A CLEAR VIEW OF YOUR SHOP</span>
           <h3>
             {tab === "Overview"
               ? "Your khata, at a glance."
@@ -373,7 +373,7 @@ function DashboardPreview() {
                 ? "People behind the numbers."
                 : "Every entry. Every detail."}
           </h3>
-          <p>Clarity for your shop. Room for your day.</p>
+          <p>See balances and entries at a glance.</p>
           <div className="preview-stats">
             {["Outstanding", "Customers", "Ledger entries"].map((label, i) => (
               <div key={label}>
@@ -405,7 +405,7 @@ function DashboardPreview() {
               and link your shop.
             </p>
             <a href="#/workspace">
-              Explore the workspace
+              Open dashboard
               <ArrowUpRight size={13} />
             </a>
           </div>
@@ -439,7 +439,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
               <ArrowUpRight size={14} />
             </button>
             <button className="site-button site-button-green site-button-small" onClick={onStart}>
-              Get started
+              Create account
               <ArrowRight size={15} />
             </button>
             <button
@@ -472,7 +472,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
                 onStart();
               }}
             >
-              Get started
+              Create account
               <ArrowRight size={16} />
             </button>
             <button
@@ -481,7 +481,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
                 onLogin();
               }}
             >
-              Log in to your shop
+              Log in
               <ArrowRight size={16} />
             </button>
           </nav>
@@ -492,7 +492,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
           <div className="hero-copy">
             <div className="site-pilot-tag">
               <span />
-              MADE FOR YOUR EVERYDAY DUKAAN
+              A SIMPLE KHATA FOR YOUR SHOP
             </div>
             <h1>
               Less hisaab.
@@ -500,35 +500,35 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
               <em>More dukaan.</em>
             </h1>
             <p className="hero-description">
-              You know your customers by name.
+              Track credit and payments.
               <br />
-              Your khata should feel just as simple.
+              See each customer’s balance.
             </p>
             <p className="hero-explainer">
-              A clearer way to keep track of credit, payments, and the people behind them. A digital
-              khata today. A WhatsApp-first voice workflow, built for what comes next.
+              See customer balances and payment history in one place. Voice entry needs pilot
+              setup.
             </p>
             <div className="hero-ctas">
               <button className="site-button site-button-green" onClick={onStart}>
-                Get started
+                Create account
                 <ArrowRight size={17} />
               </button>
               <a href="#demo" className="site-watch">
                 <span>
                   <Play size={12} fill="currentColor" />
                 </span>
-                See it in action
+                See a voice example
               </a>
             </div>
             <div className="hero-assurance">
               <span>
                 <ShieldCheck size={15} />
-                Private to your shop
+                For your shop
               </span>
               <i />
               <span>
                 <Undo2 size={15} />
-                Mistakes stay reversible
+                Corrections keep a history
               </span>
             </div>
           </div>
@@ -540,53 +540,51 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
               <BookOpen size={17} />
             </span>
             <p>
-              <strong>Clarity starts with the dashboard.</strong>
+              <strong>Start with your shop dashboard.</strong>
               <span>
-                {" "}
-                Owner accounts and ledger tools are available for configured pilot shops.
+                Create an account, then ask your onboarding administrator to link your shop.
               </span>
             </p>
           </div>
           <a href="#faq">
-            Voice & WhatsApp setup details
+            How voice setup works
             <ArrowUpRight size={14} />
           </a>
         </div>
         <section className="site-how site-section site-container" id="how-it-works">
           <div className="section-intro">
-            <span className="site-kicker">FAMILIAR WORDS. A SIMPLER ROUTINE.</span>
+            <span className="site-kicker">THREE SIMPLE STEPS</span>
             <h2>
-              Your day is busy.
+              Keep your khata clear.
               <br />
-              Your khata doesn’t have to be.
+              Keep your day moving.
             </h2>
             <p>
-              From your first customer to your last entry of the day,
-              <br className="site-desktop-break" /> keep the important things clear.
+              Record each sale on credit and each payment in one place.
             </p>
           </div>
           <div className="how-grid">
             {[
               {
                 n: "01",
-                title: "Speak naturally.",
-                copy: "Say the customer’s name, amount, and whether it is credit or a payment. Voice is part of the connected pilot and requires setup.",
+                title: "Add a credit or payment.",
+                copy: "Use the dashboard today. Voice entry needs more setup and testing before it is ready.",
                 icon: Mic,
-                foot: "Your everyday words",
+                foot: "Dashboard available for pilot shops",
               },
               {
                 n: "02",
-                title: "AI understands your entry.",
-                copy: "The workflow checks the customer, amount, and action. Unclear details should be reviewed, not guessed.",
+                title: "Check the details.",
+                copy: "Review the customer, amount, and entry type before anything is recorded.",
                 icon: AudioLines,
-                foot: "Review before it counts",
+                foot: "You stay in control",
               },
               {
                 n: "03",
-                title: "Your khata updates after validation.",
-                copy: "Once confirmed, the entry updates the ledger. Review the history later and correct mistakes with a reason.",
+                title: "See the updated balance.",
+                copy: "Review past entries and correct mistakes with a reason. The original stays in the history.",
                 icon: BookOpen,
-                foot: "A clear record, kept together",
+                foot: "A clear history for each customer",
               },
             ].map((step) => (
               <article key={step.n}>
@@ -610,17 +608,15 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
           <div className="site-container">
             <div className="section-intro split-intro">
               <div>
-                <span className="site-kicker">LESS CLUTTER. MORE CLARITY.</span>
+                <span className="site-kicker">THE EVERYDAY SHOP RECORDS</span>
                 <h2>
-                  Everything a good
+                  The essentials,
                   <br />
-                  khata should remember.
+                  all in one place.
                 </h2>
               </div>
               <p>
-                Not an accounting course. Not another complicated app.
-                <br />
-                Just the essentials, thoughtfully kept together.
+                No accounting jargon. Just customers, balances, payments, and history.
               </p>
             </div>
             <div className="feature-grid">
@@ -628,35 +624,35 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
                 <span className="feature-icon">
                   <UsersRound size={23} />
                 </span>
-                <h3>People, not account numbers.</h3>
+                <h3>Keep customer details together.</h3>
                 <p>
-                  Names, familiar landmarks, and aliases. Keep each customer’s balance and complete
-                  history together.
+                  Find each customer by name or a familiar landmark. See their balance and past
+                  entries in one place.
                 </p>
                 <div className="feature-customer-visual" aria-hidden="true">
                   <div className="feature-person">
                     <span>R</span>
                     <div>
-                      <strong>A familiar name</strong>
-                      <small>A landmark you remember</small>
+                      <strong>Ramesh</strong>
+                      <small>Near the temple</small>
                     </div>
                     <Check size={15} />
                   </div>
                   <div className="feature-alias">
-                    <span>ALSO KNOWN AS</span>
-                    <i>The name you use every day</i>
+                    <span>LANDMARK</span>
+                    <i>Near the temple</i>
                   </div>
                 </div>
-                <span className="feature-foot">CUSTOMER MANAGEMENT</span>
+                <span className="feature-foot">CUSTOMER DETAILS</span>
               </article>
               <article className="feature-card">
                 <span className="feature-icon">
                   <Wallet size={23} />
                 </span>
-                <h3>Know what’s baaki.</h3>
+                <h3>Know each balance.</h3>
                 <p>
-                  Credits, payments, and a running balance. A clear view of what’s owed, without the
-                  mental maths.
+                  Record credit and payments. See each customer’s balance without doing the sums
+                  yourself.
                 </p>
                 <div className="feature-equation">
                   <span>Credit</span>
@@ -665,21 +661,21 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
                   <ArrowRight size={15} />
                   <strong>Clarity</strong>
                 </div>
-                <span className="feature-foot">YOUR OWNER DASHBOARD</span>
+                <span className="feature-foot">YOUR SHOP DASHBOARD</span>
               </article>
               <article className="feature-card">
                 <span className="feature-icon">
                   <History size={23} />
                 </span>
-                <h3>A record, not a rewrite.</h3>
+                <h3>Fix mistakes with a record.</h3>
                 <p>
-                  Every correction has a reason. Every reversal keeps the original. Follow the story
-                  behind each number.
+                  Correct an entry with a reason. The original stays in the history, so you can see
+                  what changed.
                 </p>
                 <div className="feature-timeline">
                   <div>
                     <span />
-                    <p>Original entry preserved</p>
+                    <p>Original entry kept</p>
                     <Check size={13} />
                   </div>
                   <div>
@@ -689,57 +685,55 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
                   </div>
                   <div>
                     <span />
-                    <p>Balance updated together</p>
+                    <p>Balance recalculated</p>
                     <Check size={13} />
                   </div>
                 </div>
-                <span className="feature-foot">TRACEABLE CORRECTIONS</span>
+                <span className="feature-foot">CLEAR ENTRY HISTORY</span>
               </article>
             </div>
           </div>
         </section>
         <section className="site-voice site-section site-container">
           <div className="section-intro">
-            <span className="site-kicker">BUILT AROUND THE WAY YOU SPEAK</span>
+            <span className="site-kicker">A VOICE ENTRY, STEP BY STEP</span>
             <h2>
-              “Bas bol diya.
+              Say it once.
               <br />
-              <em>Hisaab ho gaya.</em>”
+              <em>Check it before it counts.</em>
             </h2>
             <p>
-              See the voice-first workflow in a few simple examples.
-              <br />A clear amount, a clear customer, and no guessing.
+              See an example of adding credit, recording a payment, or checking a balance.
             </p>
           </div>
           <VoiceDemo />
           <div className="voice-pilot-note">
             <Mic size={16} />
             <p>
-              <strong>Voice is a connected-pilot feature.</strong> WhatsApp, speech, and AI
-              providers require setup and live verification. Until then, manage entries in the
-              dashboard.
+              <strong>Voice entry is not live yet.</strong> WhatsApp and voice services need setup
+              and testing. For now, pilot shops can record entries in the dashboard.
             </p>
           </div>
         </section>
         <section className="site-dashboard-section" id="workspace-preview">
           <div className="site-container dashboard-section-inner">
             <div className="dashboard-section-copy">
-              <span className="site-kicker">THE BIG PICTURE. WITHOUT THE BIG EFFORT.</span>
+              <span className="site-kicker">YOUR SHOP AT A GLANCE</span>
               <h2>
-                A little space
+                Know what’s
                 <br />
-                for a lot of clarity.
+                happening in your khata.
               </h2>
               <p>
-                Open your dashboard. See who’s on your khata, what’s outstanding, and what changed.
-                Nothing more complicated than it needs to be.
+                See outstanding balances, customer histories, and recent changes from your
+                dashboard.
               </p>
               <ul>
                 {[
-                  "One view of your shop’s balances",
-                  "Customer-wise history, always in reach",
-                  "Reason-required corrections and audit logs",
-                  "Search, review, and export loaded entries",
+                  "See balances across your shop",
+                  "Check one customer’s entry history",
+                  "Correct mistakes with a reason",
+                  "Search and export available records",
                 ].map((text) => (
                   <li key={text}>
                     <Check size={15} />
@@ -748,10 +742,10 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
                 ))}
               </ul>
               <a className="site-button site-button-outline" href="#/workspace">
-                Explore your workspace
+                Open dashboard
                 <ArrowUpRight size={16} />
               </a>
-              <small>No sample data in your ledger. Ever.</small>
+              <small>Your real records appear after your shop is linked.</small>
             </div>
             <DashboardPreview />
           </div>
@@ -768,25 +762,25 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
             <span>SMALL SHOPS. BIG RELATIONSHIPS.</span>
           </div>
           <div className="neighbourhood-copy">
-            <span className="site-kicker">FOR THE SHOPS THAT KNOW YOUR NAME</span>
+            <span className="site-kicker">MADE FOR LOCAL SHOPS</span>
             <h2>
-              Your customers
+              You know your
               <br />
-              aren’t strangers.
+              customers.
               <br />
-              <em>Your khata gets it.</em>
+              <em>Keep their khata close.</em>
             </h2>
-            <p>The morning regular. The family next door. The person who says, “Kal de dunga.”</p>
+            <p>The regular from around the corner. The neighbour who’ll pay tomorrow.</p>
             <p>
-              Your shop runs on a kind of trust that a spreadsheet can’t explain. Udhaar is built to
-              bring a little order to those everyday accounts—without losing the human part.
+              Keep everyday credit and payments organized without turning your shop into an
+              accounting office.
             </p>
             <div className="neighbourhood-sign">
               <AudioLines size={21} />
               <span>
-                Built for kirana stores.
+                Made for everyday shops.
                 <br />
-                <strong>And the people who keep them going.</strong>
+                <strong>And the customers they know.</strong>
               </span>
             </div>
           </div>
@@ -794,30 +788,30 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
         <section className="site-security-section" id="security">
           <div className="site-container">
             <div className="section-intro">
-              <span className="site-kicker">TRUST SHOULD NEVER BE AN AFTERTHOUGHT</span>
+              <span className="site-kicker">YOUR RECORDS, WITH CARE</span>
               <h2>
-                Your shop. Your records.
+                Know what gets recorded.
                 <br />
-                <em>Thoughtfully protected.</em>
+                <em>Keep a clear history.</em>
               </h2>
-              <p>Simple on the surface. Deliberate about the details.</p>
+              <p>See how shop access and corrections work.</p>
             </div>
             <div className="security-grid">
               {[
                 {
                   icon: LockKeyhole,
-                  title: "A private shop boundary.",
-                  copy: "Firebase authentication and shop-scoped access rules are designed to keep one owner’s records separate from another’s.",
+                  title: "Access for your shop.",
+                  copy: "An administrator links your owner account to your shop. Access controls are designed to separate shop records.",
                 },
                 {
                   icon: Fingerprint,
-                  title: "The numbers don’t guess.",
-                  copy: "Server-side validation and atomic ledger updates—not an AI-generated balance—decide what gets recorded.",
+                  title: "Check before recording.",
+                  copy: "Review the customer and amount. Your balance comes from recorded entries, not an AI estimate.",
                 },
                 {
                   icon: Undo2,
-                  title: "History stays history.",
-                  copy: "Corrections add a reversal and a replacement. Original entries stay visible, with a reason and an actor.",
+                  title: "Corrections keep a trail.",
+                  copy: "Correct an entry with a reason. The original remains in the history.",
                 },
               ].map((item) => (
                 <article key={item.title}>
@@ -828,30 +822,28 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
               ))}
             </div>
             <button className="site-privacy-link" onClick={() => setPolicy("privacy")}>
-              Read our product privacy overview
+              How we handle your records
               <ArrowUpRight size={14} />
             </button>
           </div>
         </section>
         <section className="site-faq site-section site-container" id="faq">
           <div className="faq-intro">
-            <span className="site-kicker">A FEW THINGS WORTH KNOWING</span>
+            <span className="site-kicker">QUICK ANSWERS</span>
             <h2>
-              Clear answers.
+              Before you
               <br />
-              No small print.
+              get started.
             </h2>
             <p>
-              Starting something new should feel familiar.
-              <br />
-              Here’s where things stand.
+              The important details, in plain language.
             </p>
             <span className="faq-note">
               <MessageCircle size={19} />
               <span>
-                Need a hand getting started?
+                Need help getting set up?
                 <br />
-                <strong>Your pilot administrator can help.</strong>
+                <strong>Contact your onboarding administrator.</strong>
               </span>
             </span>
           </div>
@@ -871,20 +863,20 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
           <div className="final-cta-mark">
             <AudioLines size={36} />
           </div>
-          <span className="site-kicker">A CLEARER KHATA. A LIGHTER DAY.</span>
+          <span className="site-kicker">START WITH A CLEARER KHATA</span>
           <h2>
-            Your dukaan deserves
+            Keep your shop’s
             <br />
-            <em>a simpler khata.</em>
+            <em>hisaab simple.</em>
           </h2>
           <p>
-            Keep the trust. Make the everyday hisaab a little simpler.
+            Create an owner account. We’ll guide you through linking your shop.
           </p>
           <button className="site-button site-button-light" onClick={onStart}>
-            Get started
+            Create account
             <ArrowRight size={17} />
           </button>
-          <small>Owner dashboard · Guided pilot onboarding</small>
+          <small>Shop access is set up during the pilot.</small>
           <div className="final-cta-circle" />
         </section>
       </main>
@@ -894,104 +886,96 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
             <div>
               <SiteLogo />
               <p>
-                Apna udhaar ka hisaab.
-                <br />A little simpler, every day.
+                A simpler way to keep
+                <br />
+                your shop’s khata.
               </p>
             </div>
             <div>
               <strong>Explore</strong>
               <a href="#how-it-works">How it works</a>
               <a href="#features">Features</a>
-              <a href="#demo">Voice workflow</a>
+              <a href="#demo">Voice entry example</a>
             </div>
             <div>
-              <strong>Your khata</strong>
-              <button onClick={onStart}>Get started</button>
-              <button onClick={onLogin}>Owner login</button>
-              <a href="#/workspace">Open workspace</a>
+              <strong>Your account</strong>
+              <button onClick={onStart}>Create account</button>
+              <button onClick={onLogin}>Log in</button>
+              <a href="#/workspace">Open dashboard</a>
             </div>
             <div>
-              <strong>Good to know</strong>
-              <a href="#faq">FAQs & pilot access</a>
+              <strong>Help & information</strong>
+              <a href="#faq">FAQs and pilot setup</a>
               <button id="privacy" onClick={() => setPolicy("privacy")}>
-                Privacy overview
+                How we handle your records
               </button>
-              <button onClick={() => setPolicy("terms")}>Pilot terms</button>
+              <button onClick={() => setPolicy("terms")}>About the pilot</button>
             </div>
           </div>
           <div className="footer-bottom">
-            <span>© {new Date().getFullYear()} Udhaar. Made for the everyday dukaan.</span>
+            <span>© {new Date().getFullYear()} Udhaar. Made for local shops.</span>
             <span>
               <ShieldCheck size={13} />
-              Clarity, with care.
+              Your records, handled with care.
             </span>
           </div>
         </div>
       </footer>
       {policy && (
         <Modal
-          title={
-            policy === "privacy" ? "Your records deserve care." : "A clear start to the pilot."
-          }
-          eyebrow={policy === "privacy" ? "PRODUCT PRIVACY OVERVIEW" : "PILOT ACCESS & LIMITATIONS"}
+          title={policy === "privacy" ? "How we handle your records." : "What to expect from the pilot."}
+          eyebrow={policy === "privacy" ? "YOUR DATA" : "GETTING STARTED"}
           close={() => setPolicy(null)}
         >
           <div className="help-content">
             {policy === "privacy" ? (
               <>
-                <h3>What the product uses</h3>
+                <h3>What you add</h3>
                 <p>
-                  Owner email and authentication details are managed by Firebase Authentication.
-                  Customer names, optional phone numbers, ledger entries, consent preferences, and
-                  audit records are stored in the shop’s Firestore workspace.
+                  Your account uses your email address. Your shop workspace can store customer
+                  names, optional phone numbers, entries, and records of changes.
                 </p>
-                <h3>Access and AI</h3>
+                <h3>Who can access it</h3>
                 <p>
-                  The dashboard requires an authenticated account linked to a shop. Financial
-                  changes go through the secure API. When voice providers are connected, the
-                  necessary audio, transcript, and shop-scoped customer candidates may be sent to
-                  those providers. Provider retention and privacy terms require review before live
-                  use.
+                  You need to sign in and have a shop linked to your account to use the dashboard.
+                  Voice features are not live yet. If they are enabled in the future, audio or
+                  transcripts may be sent to the providers needed to process them.
                 </p>
-                <h3>No silent tracking or reminders</h3>
+                <h3>Messages and tracking</h3>
                 <p>
-                  Analytics is not initialized. Customer reminders are disabled by policy. Adding a
-                  phone number does not opt anyone into messaging.
+                  Automatic customer reminders are off. Adding a phone number does not sign a
+                  customer up for messages. Product analytics is not set up.
                 </p>
-                <h3>Questions and requests</h3>
+                <h3>Need help?</h3>
                 <p>
-                  Contact your onboarding administrator for account recovery, access, retention,
-                  export, or deletion requests. This is a product overview, not a final legally
-                  reviewed privacy policy. A public support contact and legal policy are required
-                  before general launch.
+                  Contact your onboarding administrator about account access or your records. This
+                  overview is not a legally reviewed privacy policy.
                 </p>
                 <p className="photo-credit">Shop photograph: Zoshua Colah / Unsplash.</p>
               </>
             ) : (
               <>
-                <h3>Who the pilot is for</h3>
+                <h3>Creating an account</h3>
                 <p>
-                  Udhaar is an owner-operated record-keeping tool for shops. Creating an account
-                  does not create a shop or grant access to another shop. Your administrator must
-                  provision and verify membership.
+                  Udhaar helps shop owners keep track of customer credit and payments. Creating an
+                  account does not create a shop or give you access to one. An administrator must
+                  link your shop.
                 </p>
-                <h3>What is available</h3>
+                <h3>What’s available</h3>
                 <p>
-                  Dashboard operations require a configured Firebase project and secure API. Voice,
-                  WhatsApp, speech, and AI availability depends on approved provider setup. There
-                  are no automatic customer reminder sends in this release.
+                  Dashboard access depends on your shop being set up. WhatsApp voice entry is not
+                  live yet. Udhaar does not send automatic customer reminders.
                 </p>
-                <h3>Your responsibilities</h3>
+                <h3>Keep your account safe</h3>
                 <p>
-                  Only enter customer information you are authorized to use. Check amounts and
-                  confirmations. Do not submit card numbers, bank credentials, or identity
-                  documents. Keep your password private.
+                  Only add customer details you are allowed to use. Check entries for accuracy.
+                  Never share your password or enter bank credentials or card numbers.
                 </p>
-                <h3>Not a payment or accounting service</h3>
+                <h3>What Udhaar doesn’t do</h3>
                 <p>
-                  Udhaar does not hold funds, reconcile bank transactions, or replace financial or
-                  legal advice. Public pricing and legally reviewed terms have not been finalized.
-                  No paid plan is started by creating an account.
+                  Udhaar records shop entries; it does not hold money, connect to your bank, or
+                  replace accounting or financial advice. Creating an account does not start a paid
+                  plan.
                 </p>
               </>
             )}

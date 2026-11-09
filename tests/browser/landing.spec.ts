@@ -9,7 +9,7 @@ test("public website has a complete, honest product experience and working secti
   await expect(
     page.getByRole("heading", { level: 1, name: "Less hisaab. More dukaan." }),
   ).toBeVisible();
-  await expect(page.getByText("Illustrative example · Live setup required")).toBeVisible();
+  await expect(page.getByText("Example only · Not a live entry")).toBeVisible();
   for (const name of ["How it works", "Features", "Why Udhaar", "FAQs"]) {
     await page
       .getByRole("navigation", { name: "Website navigation", exact: true })
@@ -19,7 +19,7 @@ test("public website has a complete, honest product experience and working secti
     expect(["#how-it-works", "#features", "#security", "#faq"]).toContain(hash);
   }
   await expect(
-    page.getByRole("heading", { name: "Clear answers. No small print." }),
+    page.getByRole("heading", { name: "Before you get started." }),
   ).toBeInViewport();
   expect(errors).toEqual([]);
 });
@@ -29,43 +29,43 @@ test("voice walkthrough changes examples and stages without using live providers
 }) => {
   await page.goto("/#demo");
   const demo = page.locator("#demo");
-  await demo.getByRole("button", { name: "Try this example" }).click();
+  await demo.getByRole("button", { name: "Show this example" }).click();
   await expect(demo.getByText("Ramesh · Near the temple")).toBeVisible();
-  await demo.getByRole("button", { name: "Show example confirmation" }).click();
+  await demo.getByRole("button", { name: "Review this entry" }).click();
   await expect(demo.getByText("₹920 + ₹340 = ₹1,260")).toBeVisible();
   await demo.getByRole("button", { name: "Record a payment", exact: true }).click();
-  await demo.getByRole("button", { name: "Try this example" }).click();
-  await demo.getByRole("button", { name: "Show example confirmation" }).click();
+  await demo.getByRole("button", { name: "Show this example" }).click();
+  await demo.getByRole("button", { name: "Review this entry" }).click();
   await expect(demo.getByText("₹920 − ₹200 = ₹720")).toBeVisible();
   await demo.getByRole("button", { name: "Check a balance", exact: true }).click();
-  await demo.getByRole("button", { name: "Try this example" }).click();
+  await demo.getByRole("button", { name: "Show this example" }).click();
   await expect(demo.getByText("Read only", { exact: true })).toBeVisible();
   await expect(demo.getByText("Nothing is sent to WhatsApp", { exact: false })).toBeVisible();
 });
 
 test("FAQ, privacy, pilot terms and workspace preview controls work", async ({ page }) => {
   await page.goto("/#faq");
-  const question = page.getByText("Will my customers get automatic payment reminders?", {
+  const question = page.getByText("Will Udhaar message my customers?", {
     exact: true,
   });
   await question.click();
   await expect(
-    page.getByText("Outbound customer reminders are disabled by policy.", { exact: false }),
+    page.getByText("Automatic customer reminders are not available.", { exact: false }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Privacy overview", exact: true }).click();
+  await page.getByRole("button", { name: "How we handle your records", exact: true }).first().click();
   await expect(
-    page.getByRole("dialog").getByRole("heading", { name: "Your records deserve care." }),
+    page.getByRole("dialog").getByRole("heading", { name: "How we handle your records." }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Pilot terms", exact: true }).click();
+  await page.getByRole("button", { name: "About the pilot", exact: true }).click();
   await expect(
-    page.getByRole("dialog").getByRole("heading", { name: "A clear start to the pilot." }),
+    page.getByRole("dialog").getByRole("heading", { name: "What to expect from the pilot." }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Close dialog" }).click();
   const preview = page.getByLabel("Dashboard interface preview with no account data");
   await preview.getByRole("button", { name: "Ledger", exact: true }).click();
   await expect(preview.getByRole("heading", { name: "Every entry. Every detail." })).toBeVisible();
-  await preview.getByRole("link", { name: "Explore the workspace" }).click();
+  await preview.getByRole("link", { name: "Open dashboard" }).click();
   await expect(page.getByRole("heading", { name: "Your khata, at a glance." })).toBeVisible();
 });
 
@@ -73,7 +73,7 @@ test("get started opens sign-up, validates password confirmation, and switches t
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Get started", exact: true }).first().click();
+  await page.getByRole("button", { name: "Create account", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Your name").fill("Shop Owner");
   await dialog.getByLabel("Email address").fill("owner@example.test");
@@ -96,19 +96,19 @@ test("hero demo link and login, signup, and footer actions reach their working d
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "See it in action" }).click();
+  await page.getByRole("link", { name: "See a voice example" }).click();
   await expect(page).toHaveURL(/#demo$/);
   await expect(page.locator("#demo")).toBeInViewport();
 
-  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await page.getByRole("banner").getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Welcome back to your khata." })).toBeVisible();
   await page.keyboard.press("Escape");
 
   const footer = page.locator(".site-footer");
-  await footer.getByRole("button", { name: "Get started", exact: true }).click();
+  await footer.getByRole("button", { name: "Create account", exact: true }).click();
   await expect(page.getByRole("dialog").getByRole("heading", { name: "A fresh start for your shop." })).toBeVisible();
   await page.keyboard.press("Escape");
-  await footer.getByRole("button", { name: "Owner login", exact: true }).click();
+  await footer.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Welcome back to your khata." })).toBeVisible();
 });
 
@@ -121,13 +121,30 @@ test("mobile and tablet landing navigation have no horizontal overflow", async (
       true,
     );
     if (width <= 820) {
+      if (width <= 620) {
+        const viewportWidth = await page.evaluate(() => innerWidth);
+        const actionBounds = await page.locator(".hero-ctas > *").evaluateAll((elements) =>
+          elements.map((element) => {
+            const { left, right } = element.getBoundingClientRect();
+            return { left, right };
+          }),
+        );
+        expect(actionBounds.every(({ left, right }) => left >= 0 && right <= viewportWidth)).toBe(
+          true,
+        );
+        expect(
+          await page
+            .locator(".hero-explainer")
+            .evaluate((element) => element.scrollWidth <= element.clientWidth),
+        ).toBe(true);
+      }
       await page.getByRole("button", { name: "Open menu" }).click();
       const nav = page.getByRole("navigation", { name: "Mobile website navigation" });
       await nav.getByRole("link", { name: "Features", exact: true }).click();
       await expect(nav).not.toBeVisible();
       await expect(page.locator("#features")).toBeInViewport();
       await page.getByRole("button", { name: "Open menu" }).click();
-      await nav.getByRole("button", { name: "Get started", exact: true }).click();
+      await nav.getByRole("button", { name: "Create account", exact: true }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
       await page.keyboard.press("Escape");
     }

@@ -1,6 +1,6 @@
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
-import { reminderPolicy, type TextToSpeech } from "./adapters";
-import { amountToHinglishWords, formatRupees } from "./money-words";
+import { reminderPolicy, type TextToSpeech } from "./adapters.js";
+import { amountToHinglishWords, formatRupees } from "./money-words.js";
 
 export const SCHEDULE = { weekday: 0, hour: 18, timezone: "Asia/Kolkata" } as const;
 const IST_OFFSET_MS = 5.5 * 3600_000;

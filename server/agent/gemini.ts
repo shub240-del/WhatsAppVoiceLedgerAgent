@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
-import { proposalJsonSchema, proposalSchema, type Proposal } from "./schema";
-import { InvalidModelOutput, ProviderUnavailable } from "./errors";
+import { proposalJsonSchema, proposalSchema, type Proposal } from "./schema.js";
+import { InvalidModelOutput, ProviderUnavailable } from "./errors.js";
 
 export type ParserContext = {
   transcript: string;

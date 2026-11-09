@@ -56,6 +56,11 @@ import {
   type Integration,
 } from "./components/ShopPanels";
 import { SetupGuide } from "./components/SetupGuide";
+import { CreateShop } from "./components/CreateShop";
+import { EntryForm } from "./components/EntryForm";
+import { displayPhone, toE164 } from "./lib/phone";
+import { db } from "./lib/firebase";
+import { collection, getDocs, limit as fsLimit, query as fsQuery } from "firebase/firestore";
 import { authErrorMessage } from "./lib/auth-errors";
 
 type Tab =
@@ -72,8 +77,17 @@ const nav = [
   { name: "Customers" as const, icon: UsersRound },
   { name: "Ledger" as const, icon: BookOpen },
   { name: "Activity" as const, icon: History },
-  { name: "Reminders" as const, icon: BellRing },
 ];
+// Plain words for the shop owner; internal tab names stay stable for URLs.
+const TAB_LABELS: Record<Tab, string> = {
+  Overview: "Home",
+  Customers: "Customers",
+  Ledger: "Entries",
+  Activity: "Activity",
+  Reminders: "Reminders",
+  Connections: "Connections",
+  Settings: "Settings",
+};
 const dateFormat = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
   month: "short",
@@ -84,7 +98,7 @@ const dateFormat = new Intl.DateTimeFormat("en-IN", {
 function tabFromHash(): Tab {
   const slug = window.location.hash.split("/")[2]?.split("?")[0]?.toLowerCase();
   return (
-    ([...nav.map((item) => item.name), "Connections", "Settings"].find(
+    ([...nav.map((item) => item.name), "Reminders", "Connections", "Settings"].find(
       (name) => name.toLowerCase() === slug,
     ) as Tab) || "Overview"
   );
@@ -116,7 +130,60 @@ export default function Dashboard() {
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [setup, setSetup] = useState(window.location.hash.includes("setup=1"));
   const operation = useRef<{ payload: string; key: string } | null>(null);
+  const [newName, setNewName] = useState("");
+  const [reason, setReason] = useState("");
+  const duplicateOf = newName.trim()
+    ? customers.filter((c) => c.name.trim().toLowerCase() === newName.trim().toLowerCase())
+    : [];
+  const [consents, setConsents] = useState<Record<string, string>>({});
+  const [ownerPhone, setOwnerPhone] = useState<string | null | undefined>(undefined);
   const now = new Date();
+  useEffect(() => {
+    if (tab !== "Customers" || !shop) return;
+    let active = true;
+    getDocs(fsQuery(collection(db, "shops", shop.id, "reminderPreferences"), fsLimit(1000)))
+      .then((snap) => {
+        if (!active) return;
+        const map: Record<string, string> = {};
+        snap.forEach((d) => (map[d.id] = String(d.get("status") ?? "unknown")));
+        setConsents(map);
+      })
+      .catch(() => active && setConsents({}));
+    return () => {
+      active = false;
+    };
+  }, [tab, shop, customers]);
+  useEffect(() => {
+    if (tab !== "Settings" || !shop) return;
+    let active = true;
+    api<{ ownerPhone: string | null }>("/api/owner/phone")
+      .then((r) => active && setOwnerPhone(r.ownerPhone))
+      .catch(() => active && setOwnerPhone(null));
+    return () => {
+      active = false;
+    };
+  }, [tab, shop]);
+  async function saveOwnerPhone(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError("");
+    let next: string | null;
+    try {
+      next = toE164(String(new FormData(e.currentTarget).get("ownerPhone")));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Check the number.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await api<{ ownerPhone: string | null }>("/api/owner/phone", { ownerPhone: next }, undefined, "PUT");
+      setOwnerPhone(result.ownerPhone);
+      notify(result.ownerPhone ? "WhatsApp number saved." : "WhatsApp number removed.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the number.");
+    } finally {
+      setBusy(false);
+    }
+  }
   useEffect(() => {
     if (!user) return;
     setDialog(null);
@@ -134,7 +201,7 @@ export default function Dashboard() {
     return () => window.removeEventListener("hashchange", syncTab);
   }, []);
   useEffect(() => {
-    document.title = `${tab} · Udhaar`;
+    document.title = `${TAB_LABELS[tab]} · Udhaar`;
   }, [tab]);
   useEffect(() => {
     const query = window.matchMedia("(max-width: 760px)");
@@ -175,6 +242,7 @@ export default function Dashboard() {
   }
   function open(next: Dialog) {
     setError("");
+    setNewName("");
     operation.current = null;
     setDialog(next);
   }
@@ -182,6 +250,7 @@ export default function Dashboard() {
     setToast(message);
   }
   function requireOwner(next: Dialog) {
+    if (next === "entry") setSelectedCustomer("");
     open(user ? next : "login");
   }
   function keyFor(payload: unknown) {
@@ -207,14 +276,32 @@ export default function Dashboard() {
     setBusy(true);
     setError("");
     const data = new FormData(e.currentTarget);
+    let phone: string | null;
+    try {
+      phone = toE164(String(data.get("phone") ?? ""));
+    } catch (err) {
+      setBusy(false);
+      setError(err instanceof Error ? err.message : "Check the phone number.");
+      return;
+    }
     const payload = {
       name: String(data.get("name")).trim(),
       displayLabel: String(data.get("label")).trim(),
-      ...(data.get("phone") ? { phone: String(data.get("phone")).trim() } : {}),
+      ...(phone ? { phone } : {}),
     };
     if (!payload.name) {
       setBusy(false);
-      setError("Please enter a customer name, not just spaces.");
+      setError("Please enter the customer’s name.");
+      return;
+    }
+    const sameName = customers.filter((c) => c.name.trim().toLowerCase() === payload.name.toLowerCase());
+    if (
+      sameName.length &&
+      (!payload.displayLabel ||
+        sameName.some((c) => c.displayLabel.trim().toLowerCase() === payload.displayLabel.toLowerCase()))
+    ) {
+      setBusy(false);
+      setError(`You already have a ${payload.name}. Add a different landmark so you can tell them apart.`);
       return;
     }
     try {
@@ -222,7 +309,7 @@ export default function Dashboard() {
       operation.current = null;
       setDialog(null);
       workspace.refresh();
-      notify("Customer created. Reminders remain off.");
+      notify(`${payload.name} added.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Customer could not be created.");
     } finally {
@@ -264,7 +351,7 @@ export default function Dashboard() {
       operation.current = null;
       setDialog(null);
       workspace.refresh();
-      notify(`Entry recorded. Updated balance: ${money(result.balancePaise)}.`);
+      notify(`Saved. ${customerName(payload.customerId)} now owes ${money(result.balancePaise)}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Nothing was saved. Try again.");
     } finally {
@@ -279,7 +366,7 @@ export default function Dashboard() {
     const reason = String(new FormData(e.currentTarget).get("reason")).trim();
     if (reason.length < 3) {
       setBusy(false);
-      setError("Please give a reason with at least 3 characters.");
+      setError("Tap a reason, or type one.");
       return;
     }
     const payload = {
@@ -296,7 +383,7 @@ export default function Dashboard() {
       operation.current = null;
       setReversing(null);
       workspace.refresh();
-      notify(`Reversal recorded. Updated balance: ${money(result.balancePaise)}.`);
+      notify(`Entry cancelled. ${customerName(reversing.customerId)} now owes ${money(result.balancePaise)}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Reversal failed.");
     } finally {
@@ -342,14 +429,15 @@ export default function Dashboard() {
     );
   function exportLedger() {
     const rows = [
-      ["Entry ID", "Customer ID", "Type", "Signed amount (paise)", "Status", "Created (IST)"],
+      ["Date (IST)", "Customer", "Type", "Amount (₹)", "Status", "Note", "Entry ID"],
       ...filteredEntries.map((e) => [
-        e.id,
-        e.customerId,
-        e.type,
-        String(e.signedAmountPaise),
-        reversals.has(e.id) ? "reversed" : "recorded",
         e.createdAt ? dateFormat.format(e.createdAt.toDate()) : "",
+        customerName(e.customerId),
+        e.type === "credit" ? "Udhaar" : e.type === "payment" ? "Payment" : "Correction",
+        (e.signedAmountPaise / 100).toFixed(2),
+        reversals.has(e.id) ? "Cancelled" : "Active",
+        e.notes || e.reason || "",
+        e.id,
       ]),
     ];
     const blob = new Blob(
@@ -359,10 +447,10 @@ export default function Dashboard() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "udhaar-ledger-loaded-entries.csv";
+    link.download = "udhaar-entries.csv";
     link.click();
     URL.revokeObjectURL(url);
-    notify("Exported the currently loaded ledger entries.");
+    notify(`Downloaded ${filteredEntries.length} entries.`);
   }
   const recent = entries.slice(0, 5);
   return (
@@ -434,22 +522,13 @@ export default function Dashboard() {
               onClick={() => navigate(item.name)}
             >
               <item.icon size={18} />
-              <span>{item.name}</span>
+              <span>{TAB_LABELS[item.name]}</span>
               {tab === item.name && <span className="nav-active-dot" />}
             </button>
           ))}
           <div className="nav-divider" />
           <button
-            className={`nav-item ${tab === "Connections" ? "active" : ""}`}
-            aria-current={tab === "Connections" ? "page" : undefined}
-            onClick={() => navigate("Connections")}
-          >
-            <Link2 size={18} />
-            <span>Connections</span>
-            <span className="tiny-dot" />
-          </button>
-          <button
-            className={`nav-item ${tab === "Settings" ? "active" : ""}`}
+            className={`nav-item ${["Settings", "Reminders", "Connections"].includes(tab) ? "active" : ""}`}
             aria-current={tab === "Settings" ? "page" : undefined}
             onClick={() => navigate("Settings")}
           >
@@ -507,9 +586,9 @@ export default function Dashboard() {
             >
               <Menu size={21} />
             </button>
-            <span>Workspace</span>
+            <span>{shop?.name || "Udhaar"}</span>
             <ChevronRight size={13} />
-            <strong>{tab}</strong>
+            <strong>{TAB_LABELS[tab]}</strong>
           </div>
           <div className="topbar-right">
             {user && (
@@ -548,31 +627,31 @@ export default function Dashboard() {
                 {tab === "Overview"
                   ? "Your khata, at a glance."
                   : tab === "Connections"
-                    ? "Connected with care."
+                    ? "Connections and setup status."
                     : tab === "Settings"
                       ? "Your workspace settings."
                       : tab === "Customers"
-                        ? "People behind the numbers."
+                        ? "Who owes you, and how much."
                         : tab === "Activity"
                           ? "Every change, on the record."
                           : tab === "Reminders"
                             ? "Reminders, held until approved."
-                            : "Every entry. Every detail."}
+                            : "Every entry, in one place."}
               </h1>
               <p>
                 {tab === "Overview"
                   ? "Less time keeping accounts. More time running your shop."
                   : tab === "Connections"
-                    ? "Only verified services get access to your workspace."
+                    ? "For whoever set up Udhaar: which services are switched on."
                     : tab === "Settings"
-                      ? "A private, owner-only space for your shop’s records."
+                      ? "Your shop name, WhatsApp number and account."
                       : tab === "Customers"
-                        ? "A clear view of your customers and their running balances."
+                        ? "Tap a name to see their full history."
                         : tab === "Activity"
-                          ? "The audit trail and any voice entries waiting on your answer."
+                          ? "Questions waiting for your answer, and every change made."
                           : tab === "Reminders"
-                            ? "Consent, eligibility and skip reasons for the Sunday run."
-                            : "A complete, traceable record. Nothing silently changed or deleted."}
+                            ? "Who has agreed to Sunday reminders, and who is skipped."
+                            : "Every udhaar and payment. Mistakes are fixed, never erased."}
               </p>
             </div>
             <div className="heading-actions">
@@ -609,7 +688,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <strong>A fresh start for your shop.</strong>
-                <span>Firebase is configured. Sign in to securely open your own khata.</span>
+                <span>Sign in with Google to open your shop’s khata.</span>
               </div>
               <button onClick={() => open("login")}>
                 Sign in as owner <ArrowRight size={15} />
@@ -620,24 +699,25 @@ export default function Dashboard() {
             <div className="error-banner" role="alert">
               {workspace.error}
               <button onClick={workspace.refresh}>Retry</button>
-              {user && <button onClick={() => setSetup(true)}>Open setup guide</button>}
+              
             </div>
           )}
-          {user && !shop && !loading && !workspace.error && (
+          {user && !shop && !loading && !workspace.error && !workspace.needsShop && (
             <div className="page-loading" role="status">
               <LoaderCircle size={16} className="spin" />
               Verifying your shop access…
             </div>
           )}
-          {user && shop && !import.meta.env.VITE_API_BASE_URL && (
-            <div className="readonly-notice">
-              <LockKeyhole size={16} />
-              <span>
-                Your Firestore records are available to view. The secure ledger API must be
-                configured before you can add or change records.
-              </span>
-            </div>
+          {workspace.needsShop && (
+            <CreateShop
+              onCreated={() => {
+                workspace.refresh();
+                notify("Your khata is ready. Add your first customer.");
+              }}
+            />
           )}
+          {!workspace.needsShop && (
+            <>
           {tab === "Overview" && user && shop && totals.customers === 0 && !loading && (
             <section className="onboarding-banner">
               <div>
@@ -647,8 +727,7 @@ export default function Dashboard() {
                 <div>
                   <strong>Your shop is linked. Let’s make it your khata.</strong>
                   <p>
-                    Add your first customer, then record a credit or payment. We won’t add any
-                    sample data.
+                    Add your first customer, then record an udhaar or a payment.
                   </p>
                 </div>
               </div>
@@ -663,24 +742,24 @@ export default function Dashboard() {
             <>
               <div className="stats-grid">
                 <Stat
-                  label="Total outstanding"
+                  label="Total udhaar baaki"
                   value={shop ? money(totals.balance) : "₹ —"}
                   icon={<Wallet size={19} />}
-                  note="Positive customer balances only"
+                  note="Money customers owe you"
                   color="green"
                 />
                 <Stat
-                  label="Customers in your khata"
-                  value={shop ? String(totals.customers) : "—"}
+                  label="Customers who owe you"
+                  value={shop ? String(customers.filter((c) => c.balancePaise > 0).length) : "—"}
                   icon={<UsersRound size={19} />}
-                  note="People, not just numbers"
+                  note={shop ? `Out of ${totals.customers} customers` : "Sign in to see"}
                   color="blue"
                 />
                 <Stat
-                  label="Entries recorded"
+                  label="Entries"
                   value={shop ? String(totals.entries) : "—"}
                   icon={<BookOpen size={19} />}
-                  note="Including complete reversal history"
+                  note="Udhaar, payments and fixes"
                   color="orange"
                 />
               </div>
@@ -747,7 +826,7 @@ export default function Dashboard() {
                         <p>Your latest entries, with the full picture.</p>
                       </div>
                       <button className="text-button" onClick={() => navigate("Ledger")}>
-                        View ledger <ArrowRight size={14} />
+                        See all entries <ArrowRight size={14} />
                       </button>
                     </div>
                     {loading ? (
@@ -769,10 +848,10 @@ export default function Dashboard() {
                               <strong>{customerName(e.customerId)}</strong>
                               <small>
                                 {e.type === "credit"
-                                  ? "Credit added"
+                                  ? "Udhaar given"
                                   : e.type === "payment"
                                     ? "Payment received"
-                                    : "Entry reversed"}{" "}
+                                    : "Correction"}{" "}
                                 ·{" "}
                                 {e.createdAt
                                   ? dateFormat.format(e.createdAt.toDate())
@@ -794,7 +873,7 @@ export default function Dashboard() {
                         title="A clean page. A clear start."
                         description={
                           user
-                            ? "Your first ledger entry will appear here with its complete history."
+                            ? "Your first udhaar or payment will show up here."
                             : "Sign in to see your shop’s activity. Your records stay private."
                         }
                         action={user ? "Add your first entry" : "Open your khata"}
@@ -803,7 +882,7 @@ export default function Dashboard() {
                     )}
                     <div className="panel-footer">
                       <ShieldCheck size={13} />
-                      All entries are recorded with an immutable history.
+                      Mistakes are fixed with a new entry. Nothing is ever erased.
                     </div>
                   </section>
                 </div>
@@ -815,38 +894,39 @@ export default function Dashboard() {
                         <p>A few small steps. A simpler day.</p>
                       </div>
                       <span className="setup-count">
-                        {1 + (user ? 1 : 0) + (shop ? 1 : 0) + (totals.customers > 0 ? 1 : 0)}/4
+                        {(user ? 1 : 0) + (shop ? 1 : 0) + (totals.customers > 0 ? 1 : 0) + (totals.entries > 0 ? 1 : 0)}/4
                       </span>
                     </div>
                     <div className="progress-track">
                       <div
                         style={{
-                          width: `${(1 + (user ? 1 : 0) + (shop ? 1 : 0) + (totals.customers > 0 ? 1 : 0)) * 25}%`,
+                          width: `${((user ? 1 : 0) + (shop ? 1 : 0) + (totals.customers > 0 ? 1 : 0) + (totals.entries > 0 ? 1 : 0)) * 25}%`,
                         }}
                       />
                     </div>
                     <SetupStep
-                      done
-                      title="Connect Firebase"
-                      detail="Your secure foundation is configured"
-                    />
-                    <SetupStep
                       done={Boolean(user)}
-                      title="Sign in as an owner"
-                      detail="Only you can access your shop"
+                      title="Sign in with Google"
+                      detail="Only you can open your shop"
                       onClick={() => open("login")}
                     />
                     <SetupStep
                       done={Boolean(shop)}
-                      title="Link your shop"
-                      detail="An administrator verifies membership"
-                      onClick={() => navigate("Settings")}
+                      title="Name your shop"
+                      detail="Takes 10 seconds"
+                      onClick={() => (user ? navigate("Overview") : open("login"))}
                     />
                     <SetupStep
                       done={totals.customers > 0}
                       title="Add your first customer"
                       detail="A name, a landmark, a familiar face"
                       onClick={() => requireOwner("customer")}
+                    />
+                    <SetupStep
+                      done={totals.entries > 0}
+                      title="Record your first udhaar"
+                      detail="Who took what, and how much"
+                      onClick={() => requireOwner("entry")}
                     />
                   </section>
                   <section className="reminder-card">
@@ -857,16 +937,16 @@ export default function Dashboard() {
                       <span className="pill muted">OFF BY DEFAULT</span>
                     </div>
                     <h3>
-                      A thoughtful pause
+                      A thoughtful pause{" "}
                       <br />
                       on reminders.
                     </h3>
                     <p>
-                      Customer reminders stay off until Meta policy approval. Your ledger works
-                      independently.
+                      Sunday reminders to customers stay off until WhatsApp approves them. Your
+                      khata works without them.
                     </p>
-                    <button className="text-button" onClick={() => navigate("Connections")}>
-                      View policy & connections <ArrowRight size={14} />
+                    <button className="text-button" onClick={() => navigate("Reminders")}>
+                      See reminder status <ArrowRight size={14} />
                     </button>
                   </section>
                   <div className="assurance">
@@ -888,8 +968,8 @@ export default function Dashboard() {
                 <div className="search-field">
                   <Search size={16} />
                   <input
-                    aria-label="Search loaded customers"
-                    placeholder="Search loaded customers…"
+                    aria-label="Search customers"
+                    placeholder="Search by name, landmark or phone…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -900,8 +980,8 @@ export default function Dashboard() {
                   onChange={(e) => setFilter(e.target.value)}
                 >
                   <option value="all">Name: A to Z</option>
-                  <option value="highest">Highest balance</option>
-                  <option value="outstanding">Outstanding only</option>
+                  <option value="highest">Owes the most</option>
+                  <option value="outstanding">Only those who owe</option>
                 </select>
                 <button
                   className="icon-btn"
@@ -919,9 +999,10 @@ export default function Dashboard() {
                     <thead>
                       <tr>
                         <th>Customer</th>
-                        <th>Landmark / label</th>
-                        <th>Contact</th>
-                        <th>Outstanding</th>
+                        <th>Landmark</th>
+                        <th>Phone</th>
+                        <th>Baaki</th>
+                        <th>Sunday reminder</th>
                         <th />
                       </tr>
                     </thead>
@@ -938,9 +1019,20 @@ export default function Dashboard() {
                               <strong>{c.name}</strong>
                             </button>
                           </td>
-                          <td>{c.displayLabel || "Not added"}</td>
-                          <td>{c.phone || <span className="subtle">No phone added</span>}</td>
+                          <td>{c.displayLabel || <span className="subtle">—</span>}</td>
+                          <td>{c.phone ? displayPhone(c.phone) : <span className="subtle">No phone</span>}</td>
                           <td className="amount-cell">{money(c.balancePaise)}</td>
+                          <td>
+                            <span className="subtle">
+                              {!c.phone
+                                ? "Skipped · no phone"
+                                : consents[c.id] === "opted_in"
+                                  ? "Agreed"
+                                  : consents[c.id] === "opted_out"
+                                    ? "Said no"
+                                    : "Not asked yet"}
+                            </span>
+                          </td>
                           <td>
                             <button
                               className="text-button"
@@ -949,7 +1041,7 @@ export default function Dashboard() {
                                 open("entry");
                               }}
                             >
-                              Add entry
+                              New entry
                               <Plus size={13} />
                             </button>
                           </td>
@@ -964,15 +1056,15 @@ export default function Dashboard() {
                   title={search ? "No matching customers" : "Your regulars belong here."}
                   description={
                     search
-                      ? "Try a different name or load more customers."
-                      : "Add a customer to start keeping a clear, reliable account."
+                      ? "Try a different name, or load more customers below."
+                      : "Add the people who take udhaar from your shop."
                   }
                   action="Add customer"
                   onClick={() => requireOwner("customer")}
                 />
               )}
               <div className="table-bottom">
-                <span>{customers.length} customers loaded · Search applies to loaded records</span>
+                <span>Showing {customers.length} customers</span>
                 {workspace.hasMoreCustomers && (
                   <button className="text-button" onClick={workspace.loadCustomers}>
                     Load 50 more
@@ -989,8 +1081,8 @@ export default function Dashboard() {
                 <div className="search-field">
                   <Search size={16} />
                   <input
-                    aria-label="Search loaded ledger"
-                    placeholder="Search loaded entries…"
+                    aria-label="Search entries"
+                    placeholder="Search by name or note…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -1001,10 +1093,10 @@ export default function Dashboard() {
                   onChange={(e) => setFilter(e.target.value)}
                 >
                   <option value="all">All entries</option>
-                  <option value="credit">Credit</option>
-                  <option value="payment">Payment</option>
-                  <option value="reversal">Reversals</option>
-                  <option value="reversed">Reversed originals</option>
+                  <option value="credit">Udhaar given</option>
+                  <option value="payment">Payments received</option>
+                  <option value="reversal">Corrections</option>
+                  <option value="reversed">Cancelled entries</option>
                 </select>
                 <button
                   className="button secondary small"
@@ -1012,7 +1104,7 @@ export default function Dashboard() {
                   onClick={exportLedger}
                 >
                   <Download size={14} />
-                  Export loaded
+                  Download CSV
                 </button>
                 <button
                   className="icon-btn"
@@ -1029,11 +1121,11 @@ export default function Dashboard() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Customer & entry</th>
+                        <th>Customer</th>
                         <th>Type</th>
                         <th>Amount</th>
-                        <th>Date · IST</th>
-                        <th>Action</th>
+                        <th>Date</th>
+                        <th />
                       </tr>
                     </thead>
                     <tbody>
@@ -1041,21 +1133,22 @@ export default function Dashboard() {
                         <tr key={e.id}>
                           <td>
                             <strong>{customerName(e.customerId)}</strong>
-                            <small className="table-small">
-                              {e.notes || e.reason || e.source} · {e.id.slice(0, 8)}
-                            </small>
-                            <small className="table-small" title={e.createdBy}>
-                              Actor: {e.createdBy.slice(0, 12)}
-                            </small>
-                            {e.reversesEntryId && (
-                              <small className="table-small">
-                                Reverses: {e.reversesEntryId.slice(0, 8)}
-                              </small>
+                            {(e.notes || e.reason) && (
+                              <small className="table-small">{e.notes || e.reason}</small>
                             )}
+                            <small className="table-small">
+                              {e.source === "whatsapp" ? "Via WhatsApp" : "Added here"}
+                            </small>
                           </td>
                           <td>
                             <span className={`entry-tag ${e.type}`}>
-                              {reversals.has(e.id) ? "Reversed" : e.type}
+                              {reversals.has(e.id)
+                                ? "Cancelled"
+                                : e.type === "credit"
+                                  ? "Udhaar"
+                                  : e.type === "payment"
+                                    ? "Payment"
+                                    : "Correction"}
                             </span>
                           </td>
                           <td
@@ -1070,22 +1163,23 @@ export default function Dashboard() {
                               <span className="row-actions">
                                 <button className="text-button" onClick={() => setEditingEntry(e)}>
                                   <Pencil size={13} />
-                                  Edit
+                                  Fix amount
                                 </button>
                                 <button
                                   className="text-button reverse-button"
                                   onClick={() => {
                                     setError("");
+                                    setReason("");
                                     operation.current = null;
                                     setReversing(e);
                                   }}
                                 >
                                   <Undo2 size={13} />
-                                  Reverse
+                                  Cancel entry
                                 </button>
                               </span>
                             ) : (
-                              <span className="subtle">Preserved</span>
+                              <span className="subtle">Kept for history</span>
                             )}
                           </td>
                         </tr>
@@ -1096,16 +1190,14 @@ export default function Dashboard() {
               ) : (
                 <Empty
                   icon={<BookOpen size={25} />}
-                  title={search ? "No matching entries" : "Nothing recorded. Nothing guessed."}
-                  description="Your credits, payments, and reversals will appear here. Original entries are never deleted."
+                  title={search ? "No matching entries" : "No entries yet."}
+                  description="Every udhaar and payment you record will appear here."
                   action="Add entry"
                   onClick={() => requireOwner("entry")}
                 />
               )}
               <div className="table-bottom">
-                <span>
-                  {entries.length} entries loaded · Every amount is stored in integer paise
-                </span>
+                <span>Showing {entries.length} entries</span>
                 {workspace.hasMoreEntries && (
                   <button className="text-button" onClick={workspace.loadEntries}>
                     Load 50 more
@@ -1218,74 +1310,75 @@ export default function Dashboard() {
           {tab === "Settings" && (
             <div className="settings-grid">
               <section className="panel settings-card">
-                <h2>Shop & owner</h2>
-                <p>Membership is provisioned by a trusted administrator.</p>
+                <h2>Your shop</h2>
                 <dl>
                   <div>
                     <dt>Shop</dt>
-                    <dd>{shop?.name || "Not linked"}</dd>
+                    <dd>{shop?.name || "Not created yet"}</dd>
                   </div>
                   <div>
-                    <dt>Owner</dt>
+                    <dt>Signed in as</dt>
                     <dd>{user?.email || "Not signed in"}</dd>
                   </div>
                   <div>
-                    <dt>Role</dt>
-                    <dd>{shop ? "Verified owner" : "Awaiting verification"}</dd>
-                  </div>
-                  <div>
-                    <dt>Timezone</dt>
-                    <dd>Asia/Kolkata</dd>
-                  </div>
-                  <div>
-                    <dt>Ledger currency</dt>
-                    <dd>INR · integer paise</dd>
+                    <dt>Currency</dt>
+                    <dd>₹ Rupees</dd>
                   </div>
                 </dl>
                 {user ? (
                   <button className="button secondary" onClick={() => void logout()}>
                     <LogOut size={15} />
-                    Sign out securely
+                    Sign out
                   </button>
                 ) : (
                   <button className="button primary" onClick={() => open("login")}>
-                    Sign in as owner
+                    Sign in with Google
                     <ArrowRight size={15} />
                   </button>
                 )}
               </section>
               <section className="panel settings-card">
-                <h2>Safety, by design</h2>
-                <p>These protections are not optional toggles.</p>
-                {[
-                  "Shop-scoped reads and server transactions",
-                  "Original entries are never overwritten",
-                  "Mandatory reasons for every reversal",
-                  "Duplicate request protection",
-                  "Customer reminders disabled",
-                  "No analytics initialized",
-                ].map((item) => (
-                  <div className="safety-row" key={item}>
-                    <ShieldCheck size={17} />
-                    {item}
-                  </div>
-                ))}
-                <div className="setup-hint">
-                  <strong>Setting up your first shop?</strong>
-                  <p>
-                    Your owner account needs to be linked by your pilot administrator. The setup
-                    guide explains what’s done, what’s next, and how to share your owner ID safely.
-                  </p>
-                  <button
-                    className="text-button"
-                    onClick={() => (user ? setSetup(true) : open("login"))}
-                  >
-                    Open your setup guide
-                    <ArrowRight size={13} />
+                <h2>Your WhatsApp number</h2>
+                <p>Voice notes sent from this number go into your khata.</p>
+                {shop ? (
+                  <form className="form" onSubmit={saveOwnerPhone} key={ownerPhone ?? "none"}>
+                    <label>
+                      Mobile number
+                      <input
+                        name="ownerPhone"
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="98765 43210"
+                        defaultValue={displayPhone(ownerPhone)}
+                        disabled={ownerPhone === undefined}
+                      />
+                    </label>
+                    {error && tab === "Settings" && !dialog && (
+                      <p className="form-error" role="alert">
+                        {error}
+                      </p>
+                    )}
+                    <button className="button primary" disabled={busy || ownerPhone === undefined}>
+                      {busy && <LoaderCircle size={14} className="spin" />}Save number
+                    </button>
+                  </form>
+                ) : (
+                  <p className="subtle">Create your shop first.</p>
+                )}
+                <div className="more-links">
+                  <button className="button secondary small" onClick={() => navigate("Reminders")}>
+                    <BellRing size={14} />
+                    Sunday reminders
+                  </button>
+                  <button className="button secondary small" onClick={() => navigate("Connections")}>
+                    <Link2 size={14} />
+                    Connections & setup status
                   </button>
                 </div>
               </section>
             </div>
+          )}
+            </>
           )}
           <footer className="page-footer">
             <span>
@@ -1305,43 +1398,55 @@ export default function Dashboard() {
         >
           <div className="form">
             <p className="modal-description">
-              Continue with the Google account linked to your shop. Your records are visible only
-              after your owner membership is verified.
+              Continue with your Google account. New here? You’ll name your shop next.
             </p>
             {error && <p className="form-error" role="alert">{error}</p>}
             <GoogleSignInButton busy={busy} onClick={() => void submitLogin()} />
             <div className="form-note">
               <ShieldCheck size={15} />
-              Protected by Firebase Authentication. Access requires verified shop membership.
+              Only you can see your shop’s khata.
             </div>
           </div>
         </Modal>
       )}
       {dialog === "customer" && (
         <Modal
-          title="A familiar face, a clear account."
+          title="Add a customer"
           eyebrow="NEW CUSTOMER"
           close={() => !busy && setDialog(null)}
         >
           <form className="form" onSubmit={submitCustomer}>
             <label>
               Customer name
-              <input name="name" required maxLength={100} placeholder="e.g. Ramesh" />
+              <input
+                name="name"
+                required
+                maxLength={100}
+                placeholder="e.g. Ramesh"
+                autoFocus
+                onChange={(e) => setNewName(e.currentTarget.value)}
+              />
             </label>
+            {duplicateOf.length > 0 && (
+              <p className="form-warning" role="status">
+                You already have {duplicateOf.map((c) => `${c.name}${c.displayLabel ? ` (${c.displayLabel})` : ""}`).join(", ")}.
+                Add a landmark so you can tell them apart.
+              </p>
+            )}
             <label>
-              Landmark or display label
-              <input name="label" maxLength={150} placeholder="e.g. Near the temple" />
+              Landmark {duplicateOf.length ? "" : <span className="subtle">(optional)</span>}
+              <input
+                name="label"
+                maxLength={150}
+                placeholder="e.g. Near the temple, Gali no. 3"
+                required={duplicateOf.length > 0}
+              />
             </label>
             <label>
               Phone number <span className="subtle">(optional)</span>
-              <input
-                name="phone"
-                type="tel"
-                placeholder="+919876543210"
-                pattern="\+[1-9][0-9]{7,14}"
-              />
+              <input name="phone" type="tel" inputMode="tel" placeholder="98765 43210" />
             </label>
-            <p className="form-note">Adding a phone number does not opt anyone into reminders.</p>
+            <p className="form-note">We never message a customer without their permission.</p>
             {error && (
               <p className="form-error" role="alert">
                 {error}
@@ -1350,113 +1455,67 @@ export default function Dashboard() {
             <button className="button primary full" disabled={busy || !shop}>
               {busy && <LoaderCircle size={16} className="spin" />}Add customer
             </button>
-            {!shop && <p className="form-error">Link your shop before adding customers.</p>}
+            {!shop && <p className="form-error">Create your shop before adding customers.</p>}
           </form>
         </Modal>
       )}
       {dialog === "entry" && (
-        <Modal
-          title="Keep the numbers clear."
-          eyebrow="NEW LEDGER ENTRY"
-          close={() => !busy && setDialog(null)}
-        >
+        <Modal title="New entry" eyebrow="UDHAAR OR PAYMENT" close={() => !busy && setDialog(null)}>
           {!customers.length ? (
             <Empty
               icon={<UsersRound size={24} />}
-              title="Start with a customer."
-              description="Create a customer before recording a credit or payment."
+              title="Add a customer first."
+              description="Then you can record their udhaar or payment."
               action="Add customer"
               onClick={() => open("customer")}
             />
           ) : (
-            <form className="form" onSubmit={submitEntry}>
-              <label>
-                Customer
-                <select
-                  name="customer"
-                  defaultValue={selectedCustomer || customers[0]?.id}
-                  required
-                >
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.displayLabel ? ` · ${c.displayLabel}` : ""} · {money(c.balancePaise)}{" "}
-                      outstanding
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="form-columns">
-                <label>
-                  Entry type
-                  <select name="action">
-                    <option value="add_credit">Credit given</option>
-                    <option value="add_payment">Payment received</option>
-                  </select>
-                </label>
-                <label>
-                  Amount (₹)
-                  <input
-                    name="amount"
-                    inputMode="decimal"
-                    placeholder="340.00"
-                    pattern="[0-9]+(\.[0-9]{1,2})?"
-                    required
-                  />
-                </label>
-              </div>
-              <label>
-                Notes <span className="subtle">(optional)</span>
-                <input name="notes" maxLength={1000} placeholder="What was this for?" />
-              </label>
-              <details className="advanced">
-                <summary>Explicit confirmations for special cases</summary>
-                <label className="checkbox-label">
-                  <input name="large" type="checkbox" />I confirm an amount above ₹1,00,000.
-                </label>
-                <label className="checkbox-label">
-                  <input name="advance" type="checkbox" />
-                  If payment exceeds the balance, record the extra as an advance.
-                </label>
-              </details>
-              {error && (
-                <p className="form-error" role="alert">
-                  {error}
-                </p>
-              )}
-              <button className="button primary full" disabled={busy || !shop}>
-                {busy ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}Record
-                entry
-              </button>
-              <p className="form-note">
-                <ShieldCheck size={14} />
-                Saved atomically with its audit record. Reversible, never deleted.
-              </p>
-            </form>
+            <EntryForm
+              customers={customers}
+              initialCustomer={selectedCustomer}
+              busy={busy}
+              error={error}
+              disabled={!shop}
+              onSubmit={submitEntry}
+            />
           )}
         </Modal>
       )}
       {reversing && (
         <Modal
-          title="Reverse, don’t erase."
-          eyebrow="CONFIRM REVERSAL"
+          title="Cancel this entry?"
+          eyebrow="FIX A MISTAKE"
           close={() => !busy && setReversing(null)}
         >
           <p className="modal-description">
-            Reverse the {money(Math.abs(reversing.signedAmountPaise))} {reversing.type} for{" "}
-            <strong>{customerName(reversing.customerId)}</strong>? The original stays visible and a
-            balancing reversal is added.
+            Cancel the {money(Math.abs(reversing.signedAmountPaise))}{" "}
+            {reversing.type === "credit" ? "udhaar" : "payment"} for{" "}
+            <strong>{customerName(reversing.customerId)}</strong>? Their balance will be corrected.
+            The original stays in history, marked as cancelled.
           </p>
           <form className="form" onSubmit={submitReversal}>
+            <div className="reason-chips" role="group" aria-label="Why?">
+              {["Wrong amount", "Wrong customer", "Entered twice", "Customer returned items"].map((r) => (
+                <button
+                  type="button"
+                  key={r}
+                  aria-pressed={reason === r}
+                  onClick={() => setReason(r)}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
             <label>
-              Reason for reversal
-              <textarea
+              Reason
+              <input
                 name="reason"
                 required
                 minLength={3}
                 maxLength={500}
-                placeholder="Tell us what needs correcting…"
-                rows={3}
+                placeholder="Tap a reason above, or type one"
+                value={reason}
+                onChange={(e) => setReason(e.currentTarget.value)}
               />
             </label>
             {error && (
@@ -1465,8 +1524,8 @@ export default function Dashboard() {
               </p>
             )}
             <button className="button danger full" disabled={busy}>
-              {busy ? <LoaderCircle size={16} className="spin" /> : <Undo2 size={16} />}Confirm
-              reversal
+              {busy ? <LoaderCircle size={16} className="spin" /> : <Undo2 size={16} />}Yes, cancel
+              entry
             </button>
           </form>
         </Modal>
@@ -1515,24 +1574,20 @@ export default function Dashboard() {
           <div className="help-content">
             <h3>How entries work</h3>
             <p>
-              Credit increases a customer’s balance. Payment reduces it. All money is stored as
-              integer paise to avoid decimal rounding errors.
+              Udhaar given adds to what a customer owes you. A payment received reduces it.
             </p>
             <h3>Made a mistake?</h3>
             <p>
-              Find the entry in Ledger and choose Reverse. A reason is required, and the original
-              entry is kept. Then add a corrected entry if needed.
+              Open Entries and tap “Fix amount” or “Cancel entry”. The old entry stays in history so
+              your khata can always be trusted.
             </p>
             <h3>Can’t access your shop?</h3>
             <p>
-              Sign in with the Google account linked to your shop. Ask your project administrator
-              to provision or restore its shop membership. See{" "}
-              <code>docs/FIREBASE_SETUP.md</code>.
+              Sign in with the same Google account you used when you created your shop.
             </p>
             <h3>Need human help?</h3>
             <p>
-              Contact your shop’s onboarding administrator. A public support contact must be
-              configured before WhatsApp launch.
+              Contact the person who set up Udhaar for you.
             </p>
           </div>
         </Modal>
@@ -1546,6 +1601,7 @@ export default function Dashboard() {
           onReverse={(e) => {
             setDetailCustomer(null);
             setError("");
+            setReason("");
             operation.current = null;
             setReversing(e);
           }}
@@ -1563,7 +1619,7 @@ export default function Dashboard() {
           done={(balance) => {
             setEditingEntry(null);
             workspace.refresh();
-            notify(`Correction recorded. Updated balance: ${money(balance)}.`);
+            notify(`Fixed. New balance: ${money(balance)}.`);
           }}
         />
       )}

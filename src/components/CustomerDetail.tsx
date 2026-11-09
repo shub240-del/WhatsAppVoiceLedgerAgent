@@ -4,6 +4,7 @@ import { BellOff, BellRing, Check, LoaderCircle, Pencil, Undo2 } from "lucide-re
 import { db } from "../lib/firebase";
 import { api } from "../lib/api";
 import { money } from "../lib/money";
+import { displayPhone, toE164 } from "../lib/phone";
 import type { Entry } from "../lib/useWorkspace";
 import { Modal } from "./Modal";
 
@@ -79,7 +80,8 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
-    const phone = String(data.get("phone")).trim();
+    let phone: string | null;
+    try { phone = toE164(String(data.get("phone"))); } catch (err) { setError(err instanceof Error ? err.message : "Check the phone number."); return; }
     const aliases = String(data.get("aliases")).split(",").map((a) => a.trim()).filter(Boolean);
     setBusy(true); setError("");
     try {
@@ -90,11 +92,11 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
   }
 
   async function recordConsent(status: "opted_in" | "opted_out") {
-    if (status === "opted_in" && !window.confirm("Confirm that this customer has told you they agree to receive balance reminders. Reminders stay disabled until policy approval.")) return;
+    if (status === "opted_in" && !window.confirm("Has this customer told you they agree to get Sunday balance reminders on WhatsApp? (Reminders start only after WhatsApp approval.)")) return;
     setBusy(true); setError("");
     try {
       await api(`/api/customers/${customerId}/reminder-consent`, { status }, undefined, "PUT");
-      setConsent(status); setSaved(status === "opted_in" ? "Opt-in recorded with today's date." : "Opt-out recorded. No reminders will be sent.");
+      setConsent(status); setSaved(status === "opted_in" ? "Saved: customer agreed (today's date recorded)." : "Saved: no reminders will be sent.");
     } catch (err) { setError(err instanceof Error ? err.message : "Could not record consent."); }
     finally { setBusy(false); }
   }
@@ -105,9 +107,9 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
   return (
     <Modal title={customer.name} eyebrow={customer.displayLabel ? customer.displayLabel.toUpperCase() : "CUSTOMER"} close={close} wide>
       <div className="detail-summary">
-        <div><small>Outstanding</small><strong className={customer.balancePaise < 0 ? "advance" : ""}>{money(customer.balancePaise)}</strong>{customer.balancePaise < 0 && <span className="subtle">Advance held</span>}</div>
-        <div><small>Phone</small><strong>{customer.phone || "Not added"}</strong></div>
-        <div><small>Reminder consent</small><strong>{consent === "opted_in" ? "Opted in" : consent === "opted_out" ? "Opted out" : "Unknown"}</strong></div>
+        <div><small>Baaki (owes you)</small><strong className={customer.balancePaise < 0 ? "advance" : ""}>{money(customer.balancePaise)}</strong>{customer.balancePaise < 0 && <span className="subtle">Advance held</span>}</div>
+        <div><small>Phone</small><strong>{customer.phone ? displayPhone(customer.phone) : "Not added"}</strong></div>
+        <div><small>Sunday reminder</small><strong>{!customer.phone ? "Skipped · no phone" : consent === "opted_in" ? "Agreed" : consent === "opted_out" ? "Said no" : "Not asked yet"}</strong></div>
       </div>
       {saved && <p className="form-success" role="status"><Check size={14} />{saved}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -116,13 +118,13 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
         <form className="form" onSubmit={save}>
           <div className="form-columns">
             <label>Name<input name="name" defaultValue={customer.name} required maxLength={100} /></label>
-            <label>Landmark / label<input name="label" defaultValue={customer.displayLabel} maxLength={150} /></label>
+            <label>Landmark<input name="label" defaultValue={customer.displayLabel} maxLength={150} /></label>
           </div>
           <div className="form-columns">
-            <label>Phone (E.164)<input name="phone" type="tel" defaultValue={customer.phone ?? ""} placeholder="+919876543210" pattern="\+[1-9][0-9]{7,14}" /></label>
-            <label>Aliases <span className="subtle">(comma separated)</span><input name="aliases" defaultValue={(customer.aliases ?? []).join(", ")} placeholder="Pappu, रमेश" /></label>
+            <label>Phone<input name="phone" type="tel" inputMode="tel" defaultValue={displayPhone(customer.phone)} placeholder="98765 43210" /></label>
+            <label>Other names <span className="subtle">(comma separated)</span><input name="aliases" defaultValue={(customer.aliases ?? []).join(", ")} placeholder="Pappu, रमेश" /></label>
           </div>
-          <p className="form-note">Aliases help the voice agent recognise how you say this name. Balance can never be edited here.</p>
+          <p className="form-note">Other names help WhatsApp voice notes find the right person, e.g. “Pappu”.</p>
           <div className="button-row">
             <button type="button" className="button secondary" onClick={() => setEditing(false)} disabled={busy}>Cancel</button>
             <button className="button primary" disabled={busy}>{busy && <LoaderCircle size={14} className="spin" />}Save details</button>
@@ -130,12 +132,12 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
         </form>
       ) : (
         <div className="button-row detail-actions">
-          <button className="button secondary small" onClick={() => { setSaved(""); setEditing(true); }}><Pencil size={13} />Edit details</button>
-          {consent !== "opted_in" && <button className="button secondary small" disabled={busy || !customer.phone} title={customer.phone ? "" : "Add a phone number first"} onClick={() => recordConsent("opted_in")}><BellRing size={13} />Record opt-in</button>}
-          {consent !== "opted_out" && <button className="button secondary small" disabled={busy} onClick={() => recordConsent("opted_out")}><BellOff size={13} />Record opt-out</button>}
+          <button className="button secondary small" onClick={() => { setSaved(""); setEditing(true); }}><Pencil size={13} />Edit name / phone</button>
+          {consent !== "opted_in" && <button className="button secondary small" disabled={busy || !customer.phone} title={customer.phone ? "" : "Add a phone number first"} onClick={() => recordConsent("opted_in")}><BellRing size={13} />Customer agreed to reminders</button>}
+          {consent !== "opted_out" && <button className="button secondary small" disabled={busy} onClick={() => recordConsent("opted_out")}><BellOff size={13} />Customer said no</button>}
         </div>
       )}
-      {(customer.aliases ?? []).length > 0 && !editing && <p className="form-note">Also known as: {(customer.aliases ?? []).join(", ")}</p>}
+      {(customer.aliases ?? []).length > 0 && !editing && <p className="form-note">Also called: {(customer.aliases ?? []).join(", ")}</p>}
 
       <h3 className="detail-heading">{entries.length <= 5 && !hasMore ? "History" : `History · ${entries.length} loaded`}</h3>
       {entries.length === 0 ? <p className="subtle">No entries yet.</p> : (
@@ -143,14 +145,14 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
           {entries.map((e) => (
             <li key={e.id} className={reversed.has(e.id) ? "is-reversed" : ""}>
               <div>
-                <strong>{e.type === "credit" ? "Credit" : e.type === "payment" ? "Payment" : "Reversal"}{reversed.has(e.id) ? " · reversed" : ""}</strong>
+                <strong>{e.type === "credit" ? "Udhaar" : e.type === "payment" ? "Payment" : "Correction"}{reversed.has(e.id) ? " · cancelled" : ""}</strong>
                 <small>{e.createdAt ? dateFormat.format(e.createdAt.toDate()) : "—"} · {e.source === "whatsapp" ? "WhatsApp" : "Dashboard"}{e.reason ? ` · ${e.reason}` : ""}{e.notes ? ` · ${e.notes}` : ""}</small>
               </div>
               <span className={`amount-cell ${reversed.has(e.id) ? "reversed-text" : ""}`}>{e.signedAmountPaise > 0 ? "+" : "−"}{money(Math.abs(e.signedAmountPaise))}</span>
               {e.type !== "reversal" && !reversed.has(e.id) && (
                 <span className="row-actions">
-                  <button className="text-button" onClick={() => onEdit(e)}><Pencil size={12} />Edit</button>
-                  <button className="text-button reverse-button" onClick={() => onReverse(e)}><Undo2 size={12} />Reverse</button>
+                  <button className="text-button" onClick={() => onEdit(e)}><Pencil size={12} />Fix amount</button>
+                  <button className="text-button reverse-button" onClick={() => onReverse(e)}><Undo2 size={12} />Cancel entry</button>
                 </span>
               )}
             </li>

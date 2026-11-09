@@ -1944,19 +1944,6 @@ code {
   }
   .stat-card:last-child {
     grid-column: span 2;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    padding: 14px 16px;
-  }
-  .stat-card:last-child .stat-top {
-    justify-content: flex-start;
-    gap: 10px;
-    flex-direction: row-reverse;
-  }
-  .stat-card:last-child .stat-value {
-    margin: 0;
-    font-size: 24px;
   }
   .stat-card:last-child .stat-note {
     grid-column: span 2;

@@ -21,18 +21,20 @@ test("private workspace, navigation, login dialog and honest integration states"
     page.getByText("These are examples, not processed messages.", { exact: false }),
   ).toBeVisible();
   await page.getByRole("button", { name: "View connections", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Connected with care." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Connections and setup status." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Status not verified yet" })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Reminders are intentionally disabled." }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Customers", exact: true }).click();
   await expect(page.getByText("Your regulars belong here.")).toBeVisible();
-  await page.getByRole("button", { name: "Ledger", exact: true }).click();
-  await expect(page.getByText("Nothing recorded. Nothing guessed.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export loaded" })).toBeDisabled();
+  await page.getByRole("button", { name: "Entries", exact: true }).click();
+  await expect(page.getByText("No entries yet.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download CSV" })).toBeDisabled();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByText("No analytics initialized")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your WhatsApp number" })).toBeVisible();
+  await page.getByRole("button", { name: "Sunday reminders" }).click();
+  await expect(page.getByRole("heading", { name: "Reminders, held until approved." })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -44,8 +46,8 @@ test("mobile layout and navigation have no horizontal overflow", async ({ page }
     true,
   );
   await page.getByRole("button", { name: "Open navigation" }).click();
-  await page.getByRole("button", { name: "Connections", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Connected with care." })).toBeVisible();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Your workspace settings." })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

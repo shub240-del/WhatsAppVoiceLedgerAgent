@@ -5,12 +5,13 @@ import helmet from "helmet";
 import { z } from "zod";
 import type { Auth } from "firebase-admin/auth";
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
-import { LedgerService } from "./ledger";
-import { ServiceError, ensure } from "./domain";
-import { reminderPolicy } from "./adapters";
-import { integrationStatuses, whatsappConfig } from "./config";
-import { ingestWebhook, verifySignature } from "./whatsapp/webhook";
-import { log } from "./log";
+import { LedgerService } from "./ledger.js";
+import { OnboardingService } from "./onboarding.js";
+import { ServiceError, ensure } from "./domain.js";
+import { reminderPolicy } from "./adapters.js";
+import { integrationStatuses, whatsappConfig } from "./config.js";
+import { ingestWebhook, verifySignature } from "./whatsapp/webhook.js";
+import { log } from "./log.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
 const safeEqual = (a: string, b: string) => {
@@ -74,6 +75,7 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
   app.use(cors({ origin: allowedOrigin, methods: ["GET", "POST", "PATCH", "PUT"], allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "X-Request-Id"], exposedHeaders: ["X-Request-Id"] }));
   app.use(express.json({ limit: "16kb" }));
   const ledger = new LedgerService(store);
+  const onboarding = new OnboardingService(store);
   const budgets = new Map<string, { count: number; reset: number }>();
 
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
@@ -103,6 +105,16 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try { await handler(req, res); } catch (error) { next(error); }
     };
+  app.post("/api/onboarding/shop", route(async (req, res) => {
+    const result = await onboarding.createShop(res.locals.uid, req.body);
+    res.status(result.created ? 201 : 200).json(result);
+  }));
+  app.get("/api/owner/phone", route(async (_req, res) => {
+    res.json(await onboarding.ownerPhone(res.locals.uid));
+  }));
+  app.put("/api/owner/phone", route(async (req, res) => {
+    res.json(await onboarding.setOwnerPhone(res.locals.uid, req.body));
+  }));
   app.post("/api/ledger/actions", route(async (req, res) => {
     res.json(await ledger.execute(res.locals.uid, req.body, req.get("Idempotency-Key")));
   }));

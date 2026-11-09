@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { FieldPath, Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { z } from "zod";
-import { normalizeName } from "./matching";
+import { normalizeName } from "./matching.js";
 import {
   actionSchema,
   checkedBalance,
@@ -12,7 +12,7 @@ import {
   type Action,
   type LedgerEntry,
   type WriteAction,
-} from "./domain";
+} from "./domain.js";
 
 export type WriteContext = { source: "dashboard" | "whatsapp"; sourceMessageId?: string };
 

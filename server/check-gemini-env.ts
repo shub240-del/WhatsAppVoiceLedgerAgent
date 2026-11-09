@@ -1,4 +1,4 @@
-import { geminiEnvironmentStatus } from "./gemini-config";
+import { geminiEnvironmentStatus } from "./gemini-config.js";
 
 // No key, partial key, length, provider request, or ledger access is exposed.
 const status = geminiEnvironmentStatus();

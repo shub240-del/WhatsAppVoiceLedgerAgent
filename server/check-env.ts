@@ -1,4 +1,4 @@
-import { integrationStatuses } from "./config";
+import { integrationStatuses } from "./config.js";
 
 // Prints only states and non-secret details.
 const required = ["FIREBASE_PROJECT_ID", "ALLOWED_ORIGIN"].filter((k) => !process.env[k]?.trim());

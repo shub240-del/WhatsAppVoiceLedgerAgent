@@ -1,9 +1,9 @@
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
-import { VoiceAgent, type Checkpoint } from "./agent/voice-agent";
-import { msg } from "./agent/messages";
-import type { InboundPayload } from "./whatsapp/webhook";
-import type { WhatsAppGateway } from "./whatsapp/client";
-import type { Handler, Job } from "./jobs";
+import { VoiceAgent, type Checkpoint } from "./agent/voice-agent.js";
+import { msg } from "./agent/messages.js";
+import type { InboundPayload } from "./whatsapp/webhook.js";
+import type { WhatsAppGateway } from "./whatsapp/client.js";
+import type { Handler, Job } from "./jobs.js";
 
 export function createHandlers(db: Firestore, agent: VoiceAgent, whatsapp: WhatsAppGateway, now: () => number = Date.now) {
   const handler: Handler = async (job, save) => {

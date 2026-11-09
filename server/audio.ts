@@ -1,4 +1,4 @@
-import { UnusableAudio } from "./agent/errors";
+import { UnusableAudio } from "./agent/errors.js";
 
 // WhatsApp-supported inbound audio types (Cloud API media docs). OGG must be Opus.
 const ALLOWED = new Set(["audio/ogg", "audio/opus", "audio/mpeg", "audio/amr", "audio/mp4", "audio/aac"]);

@@ -1,7 +1,7 @@
-import { adminAuth, store } from "./admin";
-import { createApi } from "./app";
-import { integrationStatuses } from "./config";
-import { log } from "./log";
+import { adminAuth, store } from "./admin.js";
+import { createApi } from "./app.js";
+import { integrationStatuses } from "./config.js";
+import { log } from "./log.js";
 
 for (const s of integrationStatuses()) log("info", "integration_status", { provider: s.provider, state: s.state });
 const app = createApi(store, adminAuth, process.env.ALLOWED_ORIGIN || "");

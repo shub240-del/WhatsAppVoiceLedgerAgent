@@ -24,3 +24,6 @@ logs/
 test-results/
 playwright-report/
 .firebase/
+
+# Local Vercel build output
+.vercel/

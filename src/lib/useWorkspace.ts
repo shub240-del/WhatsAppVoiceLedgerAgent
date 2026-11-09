@@ -46,6 +46,7 @@ export function useWorkspace() {
   const [reversals, setReversals] = useState<Set<string>>(new Set());
   const [totals, setTotals] = useState({ balance: 0, customers: 0, entries: 0 });
   const [error, setError] = useState("");
+  const [needsShop, setNeedsShop] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
@@ -69,6 +70,7 @@ export function useWorkspace() {
     setCustomers([]);
     setEntries([]);
     setError("");
+    setNeedsShop(false);
     setReversals(new Set());
     setTotals({ balance: 0, customers: 0, entries: 0 });
     if (!user) {
@@ -79,15 +81,15 @@ export function useWorkspace() {
     async function load() {
       try {
         const membership = await getDoc(doc(db, "owners", user!.uid));
-        if (
-          !membership.exists() ||
-          membership.get("active") !== true ||
-          membership.get("role") !== "owner"
-        ) {
-          throw new Error(
-            "Your login is valid, but owner membership is not provisioned. Ask your administrator to link this account to a shop.",
-          );
+        if (!membership.exists()) {
+          // New owner: not an error, just the "name your shop" step.
+          if (active) setNeedsShop(true);
+          return;
         }
+        if (membership.get("active") !== true || membership.get("role") !== "owner") {
+          throw new Error("This account has been disabled. Contact Udhaar support.");
+        }
+        if (active) setNeedsShop(false);
         const shopId = membership.get("shopId") as string;
         const shopSnapshot = await getDoc(doc(db, "shops", shopId));
         if (!shopSnapshot.exists() || shopSnapshot.get("active") !== true)
@@ -167,6 +169,7 @@ export function useWorkspace() {
     reversals: visible ? reversals : new Set<string>(),
     totals: visible ? totals : { balance: 0, customers: 0, entries: 0 },
     error,
+    needsShop: Boolean(user) && needsShop,
     loading,
     hasMoreCustomers,
     hasMoreEntries,

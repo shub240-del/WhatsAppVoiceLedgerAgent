@@ -1,6 +1,6 @@
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
-import { ProviderUnavailable } from "./agent/errors";
-import { WhatsAppHttpError } from "./whatsapp/client";
+import { ProviderUnavailable } from "./agent/errors.js";
+import { WhatsAppHttpError } from "./whatsapp/client.js";
 
 export const MAX_ATTEMPTS = 3;
 export const LEASE_MS = 2 * 60 * 1000;

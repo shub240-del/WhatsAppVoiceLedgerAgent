@@ -75,10 +75,8 @@ test("get started offers Google sign-in and explains owner provisioning", async 
   await page.goto("/");
   await page.getByRole("button", { name: "Create account", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeDisabled();
-  await dialog.getByRole("checkbox").check();
   await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
-  await expect(dialog.getByText(/administrator will securely link your shop/i)).toBeVisible();
+  await expect(dialog.getByText(/then name your shop/i)).toBeVisible();
   await expect(dialog.getByLabel("Email address")).toHaveCount(0);
   await expect(dialog.getByLabel("Password")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Log in", exact: true }).click();

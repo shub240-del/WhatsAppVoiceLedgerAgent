@@ -55,6 +55,28 @@ origin and frontend `VITE_API_BASE_URL` must be configured and deployed separate
 authenticated ledger mutations can work in production. Do not treat a successful Hosting
 deployment as a complete backend deployment.
 
+
+## 2a. Vercel deployment (frontend + API on one domain)
+
+`vercel.json` routes `/api/*`, `/webhooks/*` and `/health` to the serverless function in
+`api/index.ts`, which runs the same Express API as `pnpm api`. The frontend calls `/api` on its
+own domain, so `VITE_API_BASE_URL` is not needed on Vercel.
+
+Set in Vercel → Project → Settings → Environment Variables, then redeploy:
+
+| Variable | Value |
+| --- | --- |
+| `FIREBASE_SERVICE_ACCOUNT` | Full service-account JSON (Firebase console → Project settings → Service accounts → Generate new private key). Secret; never commit it. |
+| `ALLOWED_ORIGIN` | Optional. Defaults to `https://<production domain>`. |
+| `META_*`, `GNANI_API_KEY`, `APP_GEMINI_*` | Later, when WhatsApp / voice providers are connected. |
+
+Until `FIREBASE_SERVICE_ACCOUNT` is set, the API answers `503 SERVER_NOT_CONFIGURED` and the
+dashboard shows that message instead of saving. Check with `https://<domain>/health` → `{"status":"ok"}`.
+
+New owners now create their own shop from the dashboard (`POST /api/onboarding/shop`): one shop per
+Google account, tenant always taken from the verified token. `pnpm provision:owner` still works for
+manual setup.
+
 ## 3. Environment variables
 
 Frontend variables are public and bundled by Vite. Never put privileged secrets in them.

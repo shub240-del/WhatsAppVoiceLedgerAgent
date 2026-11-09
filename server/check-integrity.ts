@@ -1,5 +1,5 @@
-import { store } from "./admin";
-import { verifyShopBalances } from "./integrity";
+import { store } from "./admin.js";
+import { verifyShopBalances } from "./integrity.js";
 
 let failures = 0;
 const shops = await store.collection("shops").get();

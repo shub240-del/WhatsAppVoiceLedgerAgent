@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Timestamp } from "firebase-admin/firestore";
-import { adminAuth, store } from "./admin";
-import { documentId } from "./domain";
+import { adminAuth, store } from "./admin.js";
+import { documentId } from "./domain.js";
 
 // Explicit administrative command; never invoked by the frontend or on startup.
 const [uid, name, phone] = process.argv.slice(2);

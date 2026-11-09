@@ -4,8 +4,8 @@ type Method = "GET" | "POST" | "PATCH" | "PUT";
 export async function api<T>(path: string, body?: unknown, key?: string, method?: Method): Promise<T> {
   const user = auth.currentUser;
   if (!user) throw new Error("Please sign in as a shop owner.");
-  const base = import.meta.env.VITE_API_BASE_URL;
-  if (!base) throw new Error("The secure ledger API is not configured. See docs/DEPLOYMENT_GUIDE.md.");
+  // Same-origin by default: on Vercel the API runs at /api on the site's own domain.
+  const base = import.meta.env.VITE_API_BASE_URL || "";
   const token = await user.getIdToken();
   let response: Response;
   try {
@@ -22,6 +22,8 @@ export async function api<T>(path: string, body?: unknown, key?: string, method?
     throw new Error("Could not reach the ledger API. Nothing was changed; check your connection and retry.");
   }
   const result = await response.json().catch(() => ({}));
+  if (response.status === 404 && !result.error)
+    throw new Error("The Udhaar server isn’t deployed yet, so nothing can be saved. Nothing was changed.");
   if (!response.ok) throw new Error(result.error?.message || "The request could not be completed.");
   return result as T;
 }

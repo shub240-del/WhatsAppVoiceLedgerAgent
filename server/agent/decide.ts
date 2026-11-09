@@ -1,6 +1,6 @@
-import { extractAmounts, parseAmountPhrase } from "../money-words";
-import { phraseInTranscript, resolveCustomer, type MatchCustomer } from "../matching";
-import type { Proposal } from "./schema";
+import { extractAmounts, parseAmountPhrase } from "../money-words.js";
+import { phraseInTranscript, resolveCustomer, type MatchCustomer } from "../matching.js";
+import type { Proposal } from "./schema.js";
 
 export type OpState = {
   action: "add_credit" | "add_payment" | "get_balance";

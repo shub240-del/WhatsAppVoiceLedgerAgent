@@ -1,6 +1,6 @@
-import type { WhatsAppConfig } from "../config";
-import { UnusableAudio } from "../agent/errors";
-import { MAX_AUDIO_BYTES } from "../audio";
+import type { WhatsAppConfig } from "../config.js";
+import { UnusableAudio } from "../agent/errors.js";
+import { MAX_AUDIO_BYTES } from "../audio.js";
 
 export interface WhatsAppGateway {
   fetchMedia(mediaId: string): Promise<{ bytes: Uint8Array; mimeType: string }>;

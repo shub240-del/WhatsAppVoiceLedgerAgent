@@ -1,4 +1,4 @@
-import { formatRupees } from "../money-words";
+import { formatRupees } from "../money-words.js";
 
 // Fixed, code-rendered replies. Amounts and balances always come from committed DB values.
 export const SUPPORT = () => process.env.SUPPORT_CONTACT?.trim() || "apne shop administrator";

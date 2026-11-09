@@ -1,13 +1,13 @@
-import { store } from "./admin";
-import { LedgerService } from "./ledger";
-import { geminiConfig, integrationStatuses, whatsappConfig } from "./config";
-import { GeminiParser } from "./agent/gemini";
-import { VoiceAgent } from "./agent/voice-agent";
-import { MetaWhatsAppClient } from "./whatsapp/client";
-import { JobQueue } from "./jobs";
-import { createHandlers } from "./handlers";
-import { runReminders } from "./reminders";
-import { log } from "./log";
+import { store } from "./admin.js";
+import { LedgerService } from "./ledger.js";
+import { geminiConfig, integrationStatuses, whatsappConfig } from "./config.js";
+import { GeminiParser } from "./agent/gemini.js";
+import { VoiceAgent } from "./agent/voice-agent.js";
+import { MetaWhatsAppClient } from "./whatsapp/client.js";
+import { JobQueue } from "./jobs.js";
+import { createHandlers } from "./handlers.js";
+import { runReminders } from "./reminders.js";
+import { log } from "./log.js";
 
 for (const s of integrationStatuses()) log("info", "integration_status", { provider: s.provider, state: s.state });
 const wa = whatsappConfig();

@@ -47,7 +47,7 @@ const faqs = [
   ],
   [
     "How do I get started?",
-    "Choose Create account to sign up. During the pilot, an onboarding administrator links your shop. The setup guide shows your next step.",
+    "Choose Create account, continue with Google, and name your shop. You can add customers right away.",
   ],
   [
     "How do I find a customer’s balance?",
@@ -657,7 +657,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
             <p>
               <strong>Start with your shop dashboard.</strong>
               <span>
-                Create an account, then ask your onboarding administrator to link your shop.
+                Create an account with Google and name your shop. It takes under a minute.
               </span>
             </p>
           </div>
@@ -1070,8 +1070,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
                 <h3>Creating an account</h3>
                 <p>
                   Udhaar helps shop owners keep track of customer credit and payments. Creating an
-                  account does not create a shop or give you access to one. An administrator must
-                  link your shop.
+                  account lets you create one shop that only you can see.
                 </p>
                 <h3>What’s available</h3>
                 <p>

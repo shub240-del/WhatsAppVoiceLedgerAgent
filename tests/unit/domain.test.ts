@@ -29,8 +29,10 @@ test("money conversion uses exact integer paise", () => {
 test("invalid and nonpositive money is rejected in server and client parsers", () => {
   for (const value of ["0", "-10", "NaN", "Infinity", "1.001", "1e3", "", ".5", "1,000", "3abc"]) {
     assert.throws(() => parseRupees(value));
-    assert.throws(() => rupeesToPaise(value));
+    // The dashboard accepts how owners type money ("1,000"); it still sends exact paise.
+    if (value !== "1,000") assert.throws(() => rupeesToPaise(value));
   }
+  assert.equal(rupeesToPaise("1,000"), 100000);
 });
 test("credit and payment calculations are exact", () => {
   assert.equal(

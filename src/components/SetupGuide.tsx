@@ -1,19 +1,7 @@
-import { useState } from "react";
-import { sendEmailVerification, type User } from "firebase/auth";
-import {
-  ArrowRight,
-  Check,
-  Copy,
-  LoaderCircle,
-  Mail,
-  RefreshCw,
-  ShieldCheck,
-  Store,
-  UserRound,
-  UsersRound,
-} from "lucide-react";
+import { type User } from "firebase/auth";
+import { ArrowRight, Check, ShieldCheck, UsersRound } from "lucide-react";
 import { Modal } from "./Modal";
-import { authErrorMessage } from "../lib/auth-errors";
+import { CreateShop } from "./CreateShop";
 
 export function SetupGuide({
   user,
@@ -30,100 +18,35 @@ export function SetupGuide({
   refresh(): void;
   addCustomer(): void;
 }) {
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function copyDetails() {
-    try {
-      await navigator.clipboard.writeText(
-        `Udhaar owner setup\nEmail: ${user.email}\nOwner UID: ${user.uid}\nPlease provision and link my shop using the trusted administrator process.`,
-      );
-      setNotice("Setup details copied. Share them privately with your onboarding administrator.");
-    } catch {
-      setError("Clipboard isn’t available. You can select and copy the owner ID below.");
-    }
-  }
-  async function verifyEmail() {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      await sendEmailVerification(user);
-      setNotice("Verification email sent. Check your inbox.");
-    } catch (e) {
-      setError(authErrorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  }
   return (
     <Modal
-      title={shopName ? "Your shop, ready for a clearer day." : "Let’s open your khata."}
-      eyebrow="YOUR FIRST STEPS"
+      title={shopName ? `${shopName} is ready.` : "Let’s open your khata."}
+      eyebrow="3 QUICK STEPS"
       close={close}
       wide
     >
-      <p className="modal-description">
-        One account. One private shop. A guided start, with no sample records added to your ledger.
-      </p>
       <ol className="onboarding-steps">
         <li className="complete">
           <span className="onboard-number">
             <Check size={17} />
           </span>
           <div>
-            <h3>Your owner account</h3>
+            <h3>Signed in</h3>
             <p>{user.email}</p>
             <span className="onboarding-badge">
               <ShieldCheck size={12} />
-              Account created
+              Only you can see your khata
             </span>
-            {!user.emailVerified && (
-              <button className="text-button" disabled={busy} onClick={verifyEmail}>
-                {busy ? <LoaderCircle size={14} className="spin" /> : <Mail size={14} />}Send
-                verification email
-              </button>
-            )}
           </div>
         </li>
         <li className={shopName ? "complete" : ""}>
           <span className="onboard-number">{shopName ? <Check size={17} /> : "2"}</span>
           <div>
-            <h3>{shopName ? `${shopName} is linked` : "Securely link your shop"}</h3>
-            <p>
-              {shopName
-                ? "Your owner account has access to this shop only."
-                : "During the pilot, your onboarding administrator verifies your details and links your shop. You cannot join a shop by entering someone else’s ID."}
-            </p>
-            {!shopName && (
-              <>
-                <label className="owner-id">
-                  Your owner ID
-                  <input readOnly value={user.uid} onFocus={(e) => e.currentTarget.select()} />
-                </label>
-                <div className="button-row">
-                  <button className="button secondary small" onClick={copyDetails}>
-                    <Copy size={14} />
-                    Copy setup details
-                  </button>
-                  <button
-                    className="button secondary small"
-                    onClick={() => {
-                      refresh();
-                      setNotice(
-                        "Checking your shop access. Close this guide to see the latest status.",
-                      );
-                    }}
-                  >
-                    <RefreshCw size={14} />
-                    Check shop access
-                  </button>
-                </div>
-                <p className="form-note">
-                  No shop has been created or linked yet. This step requires the existing trusted
-                  provisioning process.
-                </p>
-              </>
+            <h3>{shopName ? `${shopName}` : "Name your shop"}</h3>
+            {shopName ? (
+              <p>Your shop is created.</p>
+            ) : (
+              <CreateShop compact onCreated={refresh} />
             )}
           </div>
         </li>
@@ -131,7 +54,7 @@ export function SetupGuide({
           <span className="onboard-number">{hasCustomers ? <Check size={17} /> : "3"}</span>
           <div>
             <h3>Add your first customer</h3>
-            <p>A name and a familiar landmark are enough to start. Phone numbers are optional.</p>
+            <p>A name is enough. Add a landmark if two people share a name.</p>
             {shopName && !hasCustomers && (
               <button className="button primary small" onClick={addCustomer}>
                 <UsersRound size={14} />
@@ -142,24 +65,14 @@ export function SetupGuide({
             {hasCustomers && (
               <span className="onboarding-badge">
                 <Check size={12} />
-                Your khata has its first customer
+                Done
               </span>
             )}
           </div>
         </li>
       </ol>
-      {notice && (
-        <p className="form-success" role="status">
-          {notice}
-        </p>
-      )}
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
       <button className="button secondary full" onClick={close}>
-        {shopName ? "Continue to workspace" : "Continue to setup workspace"}
+        {shopName ? "Go to my khata" : "I’ll do this later"}
         <ArrowRight size={15} />
       </button>
     </Modal>

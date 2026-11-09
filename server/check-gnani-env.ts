@@ -1,4 +1,4 @@
-import { gnaniEnvironmentStatus } from "./gnani-config";
+import { gnaniEnvironmentStatus } from "./gnani-config.js";
 
 // Intentionally outputs neither the key, its length, nor any masked portion.
 const status = gnaniEnvironmentStatus();

@@ -1,6 +1,6 @@
-import { geminiEnvironmentStatus } from "./gemini-config";
-import { gnaniEnvironmentStatus } from "./gnani-config";
-import { reminderPolicy } from "./adapters";
+import { geminiEnvironmentStatus } from "./gemini-config.js";
+import { gnaniEnvironmentStatus } from "./gnani-config.js";
+import { reminderPolicy } from "./adapters.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
 export type IntegrationState = "CONFIGURED" | "NOT_CONFIGURED" | "INVALID" | "BLOCKED_EXTERNALLY" | "DISABLED_BY_POLICY";

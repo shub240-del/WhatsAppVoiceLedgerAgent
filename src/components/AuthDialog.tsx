@@ -21,7 +21,6 @@ export function AuthDialog({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [acknowledged, setAcknowledged] = useState(false);
   const signup = mode === "signup";
   async function continueWithGoogle() {
     setError("");
@@ -39,7 +38,6 @@ export function AuthDialog({
   }
   function switchMode() {
     setError("");
-    setAcknowledged(false);
     onModeChange(signup ? "login" : "signup");
   }
   return (
@@ -50,36 +48,27 @@ export function AuthDialog({
     >
       <p className="modal-description">
         {signup
-          ? "Continue with your Google account. An administrator will securely link your shop before any records are available."
+          ? "Continue with your Google account, then name your shop. That’s it."
           : "Continue with the Google account linked to your shop. Your records stay in your private workspace."}
       </p>
       <div className="form auth-form">
         {signup ? (
-          <label className="auth-ack">
-            <input
-              name="acknowledge"
-              type="checkbox"
-              checked={acknowledged}
-              onChange={(event) => setAcknowledged(event.currentTarget.checked)}
-            />
-            <span>
-              I understand this is a pilot. An administrator must link my shop before I can access
-              ledger data.{" "}
-              <a href="#privacy" onClick={() => !busy && close()}>
-                Privacy details
-              </a>
-            </span>
-          </label>
+          <p className="form-note">
+            <Check size={15} />
+            Free during the pilot. Only you can see your khata.{" "}
+            <a href="#privacy" onClick={() => !busy && close()}>
+              Privacy
+            </a>
+          </p>
         ) : (
           <p className="form-note">
             <Check size={15} />
-            Your account must already be linked to an active shop to view its records.
+            Use the same Google account you signed up with.
           </p>
         )}
         {error && <p className="form-error" role="alert">{error}</p>}
         <GoogleSignInButton
           busy={busy}
-          disabled={signup && !acknowledged}
           onClick={() => void continueWithGoogle()}
         />
         <p className="auth-switch">
@@ -92,7 +81,7 @@ export function AuthDialog({
         <div className="form-note">
           <ShieldCheck size={16} />
           <span>
-            Secure Google sign-in. Authentication alone never grants access to a shop.
+            Secure Google sign-in. No password to remember.
           </span>
         </div>
       </div>

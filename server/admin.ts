@@ -1,20 +1,14 @@
 import { applicationDefault, cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { parseServiceAccount } from "./secret.js";
 
 // This module is outside src and must never be imported by browser code.
 // Hosts without a credentials file (e.g. Vercel) pass the service-account JSON in
 // FIREBASE_SERVICE_ACCOUNT; other hosts use GOOGLE_APPLICATION_CREDENTIALS / ADC.
 function serviceAccount() {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as { project_id?: string; client_email?: string; private_key?: string };
-    if (!parsed.client_email || !parsed.private_key) throw new Error("missing fields");
-    return parsed;
-  } catch {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT must be the full service-account JSON.");
-  }
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  return raw?.trim() ? parseServiceAccount(raw) : null;
 }
 const account = serviceAccount();
 const projectId = process.env.FIREBASE_PROJECT_ID || account?.project_id;

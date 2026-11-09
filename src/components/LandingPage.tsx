@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AudioLines, Check, Mic, Undo2 } from "lucide-react";
+import { AudioLines, Check, Mic, Play, Undo2 } from "lucide-react";
 import { Modal } from "./Modal";
 import "@fontsource/mukta/400.css";
 import "@fontsource/mukta/600.css";
@@ -160,7 +160,7 @@ function Demo() {
   const done = shown >= scenario.steps.length;
 
   return (
-    <section className="l-section l-demo-section" id="demo" ref={section} aria-labelledby="demo-title">
+    <section className="l-section l-demo-section" id="khata-demo" ref={section} aria-labelledby="demo-title">
       <div className="l-section-head">
         <h2 id="demo-title">Bolo, aur khata mein likh jaata hai</h2>
         <p>Pick a situation from your day. No sign-up, nothing is saved — this is a demo.</p>
@@ -345,13 +345,16 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
         <div className="l-wrap l-header-inner">
           <SiteLogo />
           <nav className="l-nav" aria-label="Website navigation">
-            <a href="#demo">Demo</a>
             <a href="#how">How it works</a>
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
           </nav>
           <div className="l-header-actions">
+            <a className="l-btn l-btn-ghost l-demo-btn" href="#/demo">
+              <Play size={14} aria-hidden="true" />
+              Demo
+            </a>
             <button className="l-btn l-btn-ghost" onClick={onLogin}>
               Log in
             </button>
@@ -374,8 +377,9 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
             <button className="l-btn l-btn-primary l-btn-lg" onClick={onStart}>
               Try it free
             </button>
-            <a className="l-btn l-btn-ghost l-btn-lg" href="#demo">
-              See the demo
+            <a className="l-btn l-btn-ghost l-btn-lg" href="#/demo">
+              <Play size={16} aria-hidden="true" />
+              Demo
             </a>
           </div>
           <p className="l-note">No sign-up to try. Works in your phone’s browser.</p>
@@ -510,7 +514,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
           </div>
           <nav aria-label="Product">
             <h3>Product</h3>
-            <a href="#demo">Demo</a>
+            <a href="#/demo">WhatsApp demo</a>
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>

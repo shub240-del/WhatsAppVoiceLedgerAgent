@@ -14,7 +14,7 @@ test("landing tells the story in order and the demo plays without sign-up", asyn
     "How it works",
     "Everything a khata needs. Nothing it doesn’t.",
   ]);
-  await page.getByRole("link", { name: "See the demo" }).click();
+  await page.locator("#khata-demo").scrollIntoViewIfNeeded();
   const chat = page.getByLabel("Example conversation");
   await expect(chat.getByText("Ramesh ko 340 ka udhaar", { exact: false })).toBeVisible();
   await expect(page.getByLabel("Khata after this entry").getByText("₹1,240")).toBeVisible({ timeout: 6000 });
@@ -30,7 +30,7 @@ test("FAQ answers open, and every CTA leads somewhere real", async ({ page }) =>
   await page.goto("/");
   await page.getByText("Will my customers get messages from Udhaar?").click();
   await expect(page.getByText("Udhaar never messages your customers.", { exact: false })).toBeVisible();
-  for (const name of ["Demo", "How it works", "Features", "Pricing", "FAQ"]) {
+  for (const name of ["How it works", "Features", "Pricing", "FAQ"]) {
     await page.getByRole("navigation", { name: "Website navigation" }).getByRole("link", { name, exact: true }).click();
   }
   await expect(page.locator("#faq")).toBeInViewport();
@@ -80,4 +80,50 @@ test("public page has local assets, a keyboard skip link and desktop/mobile scre
   await page.goto("/");
   await page.screenshot({ path: "docs/screenshots/landing-mobile.png", fullPage: true });
   expect(failures).toEqual([]);
+});
+
+test("Demo opens a WhatsApp-style chat that answers like the real assistant and updates a live khata", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("banner").getByRole("link", { name: "Demo" }).click();
+  await expect(page).toHaveURL(/#\/demo$/);
+  const chat = page.getByRole("region", { name: /WhatsApp chat with the Udhaar bot/ });
+  await expect(chat.getByText("Udhaar Khata", { exact: true })).toBeVisible();
+  await expect(chat.getByText("Namaste! Main aapka Udhaar khata hoon.", { exact: false })).toBeVisible();
+  const khata = page.getByRole("region", { name: "The khata, live" });
+
+  // Typing works like WhatsApp: the reply is the assistant's exact wording and the khata changes.
+  await chat.getByLabel("Type a message").fill("Ramesh ko 340 ka udhaar, do Maggi aur doodh");
+  await chat.getByRole("button", { name: "Send" }).click();
+  await expect(chat.getByText("Ramesh: +₹340 (Maggi, doodh). Total baaki: ₹1,240.", { exact: false })).toBeVisible();
+  await expect(khata.getByText("₹1,240")).toBeVisible();
+
+  // Tapping a suggestion sends it as a voice note; a new name asks before adding.
+  await chat.getByRole("group", { name: "Suggested messages" }).getByRole("button").first().click(); // Sunita ne 200 diye
+  await expect(chat.getByText("Sunita: ₹200 mile. Total baaki: ₹450.", { exact: false })).toBeVisible({ timeout: 8000 });
+  await chat.getByLabel("Type a message").fill("Kishore ko 250 ka udhaar");
+  await chat.getByRole("button", { name: "Send" }).click();
+  await expect(chat.getByText("“Kishore” naam ka koi customer nahi hai.", { exact: false })).toBeVisible();
+  await chat.getByRole("button", { name: /Haan/ }).click();
+  await expect(khata.getByText("Kishore")).toBeVisible();
+  await chat.getByLabel("Type a message").fill("galat");
+  await chat.getByRole("button", { name: "Send" }).click();
+  await expect(chat.getByText("Kishore ji ka baaki ab ₹0 hai.", { exact: false })).toBeVisible();
+
+  await page.getByRole("button", { name: "Start over" }).click();
+  await expect(khata.getByText("₹900")).toBeVisible();
+  await expect(khata.getByText("Kishore")).toHaveCount(0);
+  await page.getByRole("link", { name: "Open your free khata" }).click();
+  await expect(page).toHaveURL(/#\/workspace$/);
+  expect(errors).toEqual([]);
+});
+
+test("Demo has no horizontal overflow on phones", async ({ page }) => {
+  for (const width of [390, 360, 320]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/#/demo");
+    await expect(page.getByLabel("Type a message")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
 });

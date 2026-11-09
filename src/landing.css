@@ -328,12 +328,16 @@
   .l-footer-grid { grid-template-columns: 1fr 1fr; }
   .l-footer-grid > div:first-child { grid-column: span 2; }
 }
+@media (max-width: 520px) {
+  /* Room for Demo + Try it free; Log in stays in the footer, and returning users skip this page. */
+  .l-header-actions .l-btn-ghost:not(.l-demo-btn) { display: none; }
+}
 @media (max-width: 400px) {
   .l-header-actions { gap: 6px; }
   .l-header-actions .l-btn { padding: 0 11px; }
 }
 @media (max-width: 350px) {
-  .l-header-actions .l-btn-ghost { display: none; }
+  .l-header-actions .l-btn-ghost:not(.l-demo-btn) { display: none; }
   .l-khata { padding-left: 56px; }
 }
 .l-page [id] { scroll-margin-top: 76px; }

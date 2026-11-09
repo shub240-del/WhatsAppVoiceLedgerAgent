@@ -1,0 +1,5 @@
+# Public marketing site. Shop data is only shown after Google sign-in.
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /webhooks/

@@ -58,6 +58,7 @@ import {
 import { SetupGuide } from "./components/SetupGuide";
 import { CreateShop } from "./components/CreateShop";
 import { EntryForm } from "./components/EntryForm";
+import { Assistant } from "./components/Assistant";
 import { displayPhone, toE164 } from "./lib/phone";
 import { db } from "./lib/firebase";
 import { collection, getDocs, limit as fsLimit, query as fsQuery } from "firebase/firestore";
@@ -136,7 +137,6 @@ export default function Dashboard() {
     ? customers.filter((c) => c.name.trim().toLowerCase() === newName.trim().toLowerCase())
     : [];
   const [consents, setConsents] = useState<Record<string, string>>({});
-  const [ownerPhone, setOwnerPhone] = useState<string | null | undefined>(undefined);
   const now = new Date();
   useEffect(() => {
     if (tab !== "Customers" || !shop) return;
@@ -153,37 +153,6 @@ export default function Dashboard() {
       active = false;
     };
   }, [tab, shop, customers]);
-  useEffect(() => {
-    if (tab !== "Settings" || !shop) return;
-    let active = true;
-    api<{ ownerPhone: string | null }>("/api/owner/phone")
-      .then((r) => active && setOwnerPhone(r.ownerPhone))
-      .catch(() => active && setOwnerPhone(null));
-    return () => {
-      active = false;
-    };
-  }, [tab, shop]);
-  async function saveOwnerPhone(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    let next: string | null;
-    try {
-      next = toE164(String(new FormData(e.currentTarget).get("ownerPhone")));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Check the number.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await api<{ ownerPhone: string | null }>("/api/owner/phone", { ownerPhone: next }, undefined, "PUT");
-      setOwnerPhone(result.ownerPhone);
-      notify(result.ownerPhone ? "WhatsApp number saved." : "WhatsApp number removed.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save the number.");
-    } finally {
-      setBusy(false);
-    }
-  }
   useEffect(() => {
     if (!user) return;
     setDialog(null);
@@ -657,7 +626,7 @@ export default function Dashboard() {
                   : tab === "Connections"
                     ? "For whoever set up Udhaar: which services are switched on."
                     : tab === "Settings"
-                      ? "Your shop name, WhatsApp number and account."
+                      ? "Your shop and account."
                       : tab === "Customers"
                         ? "Tap a name to see their full history."
                         : tab === "Activity"
@@ -778,6 +747,9 @@ export default function Dashboard() {
               </div>
               <div className="overview-columns">
                 <div className="overview-left">
+                  {user && shop ? (
+                    <Assistant onChanged={workspace.refresh} />
+                  ) : (
                   <section className="voice-card">
                     <div className="voice-copy">
                       <span className="pill light">
@@ -800,7 +772,7 @@ export default function Dashboard() {
                       </button>
                       <span className="voice-disclaimer">
                         <LockKeyhole size={11} />
-                        WhatsApp connection pending verification
+                        Sign in to start speaking your entries
                       </span>
                     </div>
                     <div className="voice-visual">
@@ -830,6 +802,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </section>
+                  )}
                   <section className="panel recent-panel">
                     <div className="panel-heading">
                       <div>
@@ -955,8 +928,7 @@ export default function Dashboard() {
                       on reminders.
                     </h3>
                     <p>
-                      Sunday reminders to customers stay off until WhatsApp approves them. Your
-                      khata works without them.
+                      Customer reminders are off for now. Your khata works without them.
                     </p>
                     <button className="text-button" onClick={() => navigate("Reminders")}>
                       See reminder status <ArrowRight size={14} />
@@ -1150,7 +1122,7 @@ export default function Dashboard() {
                               <small className="table-small">{e.notes || e.reason}</small>
                             )}
                             <small className="table-small">
-                              {e.source === "whatsapp" ? "Via WhatsApp" : "Added here"}
+                              {e.source === "assistant" ? "Via assistant" : e.source === "whatsapp" ? "Via WhatsApp" : "Added here"}
                             </small>
                           </td>
                           <td>
@@ -1290,7 +1262,7 @@ export default function Dashboard() {
               <section className="panel settings-card">
                 <h2>Gnani voice-to-text</h2>
                 <p>
-                  Turns WhatsApp voice notes into text. The key lives only on the server
+                  Turns what you say to the assistant into text. The key lives only on the server
                   (<code>GNANI_API_KEY</code> in Vercel). This test sends one second of silence.
                 </p>
                 <button
@@ -1371,33 +1343,8 @@ export default function Dashboard() {
                 )}
               </section>
               <section className="panel settings-card">
-                <h2>Your WhatsApp number</h2>
-                <p>Voice notes sent from this number go into your khata.</p>
-                {shop ? (
-                  <form className="form" onSubmit={saveOwnerPhone} key={ownerPhone ?? "none"}>
-                    <label>
-                      Mobile number
-                      <input
-                        name="ownerPhone"
-                        type="tel"
-                        inputMode="tel"
-                        placeholder="98765 43210"
-                        defaultValue={displayPhone(ownerPhone)}
-                        disabled={ownerPhone === undefined}
-                      />
-                    </label>
-                    {error && tab === "Settings" && !dialog && (
-                      <p className="form-error" role="alert">
-                        {error}
-                      </p>
-                    )}
-                    <button className="button primary" disabled={busy || ownerPhone === undefined}>
-                      {busy && <LoaderCircle size={14} className="spin" />}Save number
-                    </button>
-                  </form>
-                ) : (
-                  <p className="subtle">Create your shop first.</p>
-                )}
+                <h2>More</h2>
+                <p>Setup status, for whoever manages Udhaar for you.</p>
                 <div className="more-links">
                   <button className="button secondary small" onClick={() => navigate("Reminders")}>
                     <BellRing size={14} />
@@ -1570,8 +1517,7 @@ export default function Dashboard() {
           close={() => setDialog(null)}
         >
           <p className="modal-description">
-            These are examples, not processed messages. WhatsApp and speech adapters are not
-            connected yet.
+            Say these to the assistant on your Home screen, or type them.
           </p>
           <div className="command-examples">
             {[
@@ -1594,10 +1540,10 @@ export default function Dashboard() {
             className="button primary full"
             onClick={() => {
               setDialog(null);
-              navigate("Connections");
+              navigate("Overview");
             }}
           >
-            View connections
+            Go to the assistant
             <ArrowRight size={15} />
           </button>
         </Modal>

@@ -92,7 +92,7 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
   }
 
   async function recordConsent(status: "opted_in" | "opted_out") {
-    if (status === "opted_in" && !window.confirm("Has this customer told you they agree to get Sunday balance reminders on WhatsApp? (Reminders start only after WhatsApp approval.)")) return;
+    if (status === "opted_in" && !window.confirm("Has this customer told you they agree to get balance reminders? (Reminders are switched off for now; this only records their answer.)")) return;
     setBusy(true); setError("");
     try {
       await api(`/api/customers/${customerId}/reminder-consent`, { status }, undefined, "PUT");
@@ -124,7 +124,7 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
             <label>Phone<input name="phone" type="tel" inputMode="tel" defaultValue={displayPhone(customer.phone)} placeholder="98765 43210" /></label>
             <label>Other names <span className="subtle">(comma separated)</span><input name="aliases" defaultValue={(customer.aliases ?? []).join(", ")} placeholder="Pappu, रमेश" /></label>
           </div>
-          <p className="form-note">Other names help WhatsApp voice notes find the right person, e.g. “Pappu”.</p>
+          <p className="form-note">Other names help the assistant find the right person when you speak, e.g. “Pappu”.</p>
           <div className="button-row">
             <button type="button" className="button secondary" onClick={() => setEditing(false)} disabled={busy}>Cancel</button>
             <button className="button primary" disabled={busy}>{busy && <LoaderCircle size={14} className="spin" />}Save details</button>
@@ -146,7 +146,7 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
             <li key={e.id} className={reversed.has(e.id) ? "is-reversed" : ""}>
               <div>
                 <strong>{e.type === "credit" ? "Udhaar" : e.type === "payment" ? "Payment" : "Correction"}{reversed.has(e.id) ? " · cancelled" : ""}</strong>
-                <small>{e.createdAt ? dateFormat.format(e.createdAt.toDate()) : "—"} · {e.source === "whatsapp" ? "WhatsApp" : "Dashboard"}{e.reason ? ` · ${e.reason}` : ""}{e.notes ? ` · ${e.notes}` : ""}</small>
+                <small>{e.createdAt ? dateFormat.format(e.createdAt.toDate()) : "—"} · {e.source === "assistant" ? "Assistant" : e.source === "whatsapp" ? "WhatsApp" : "Dashboard"}{e.reason ? ` · ${e.reason}` : ""}{e.notes ? ` · ${e.notes}` : ""}</small>
               </div>
               <span className={`amount-cell ${reversed.has(e.id) ? "reversed-text" : ""}`}>{e.signedAmountPaise > 0 ? "+" : "−"}{money(Math.abs(e.signedAmountPaise))}</span>
               {e.type !== "reversal" && !reversed.has(e.id) && (

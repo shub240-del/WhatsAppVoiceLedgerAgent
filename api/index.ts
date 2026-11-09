@@ -19,14 +19,21 @@ async function load(): Promise<Handler> {
     import("../server/admin.js"),
     import("../server/runtime.js"),
   ]);
+  // WhatsApp is switched off: the assistant lives in the website (/api/assistant).
+  // vercel.json no longer routes /webhooks/*. To bring WhatsApp back, restore that rewrite
+  // and set WHATSAPP_ENABLED=true; the queue then drains right after Meta's webhook.
+  const whatsappEnabled = process.env.WHATSAPP_ENABLED === "true";
   let runtime: ReturnType<typeof createRuntime> | undefined;
   return createApi(store, adminAuth, allowedOrigin(), {
-    // No worker process on Vercel: voice jobs run right after Meta gets its 200 response.
-    background: {
-      schedule: (task) => waitUntil(task),
-      runtime: () => (runtime ??= createRuntime(store)),
-      budgetMs: 45_000,
-    },
+    ...(whatsappEnabled
+      ? {
+          background: {
+            schedule: (task: Promise<unknown>) => waitUntil(task),
+            runtime: () => (runtime ??= createRuntime(store)),
+            budgetMs: 45_000,
+          },
+        }
+      : {}),
   }) as unknown as Handler;
 }
 

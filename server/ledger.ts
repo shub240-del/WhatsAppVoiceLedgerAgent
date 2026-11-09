@@ -14,7 +14,7 @@ import {
   type WriteAction,
 } from "./domain.js";
 
-export type WriteContext = { source: "dashboard" | "whatsapp"; sourceMessageId?: string };
+export type WriteContext = { source: "dashboard" | "whatsapp" | "assistant"; sourceMessageId?: string };
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/);
 const aliasesSchema = z.array(z.string().trim().min(1).max(60)).max(10);

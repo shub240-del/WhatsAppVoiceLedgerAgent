@@ -40,7 +40,7 @@ test("voice walkthrough changes examples and stages without using live providers
   await demo.getByRole("button", { name: "Check a balance", exact: true }).click();
   await demo.getByRole("button", { name: "Show this example" }).click();
   await expect(demo.getByText("Read only", { exact: true })).toBeVisible();
-  await expect(demo.getByText("Nothing is sent to WhatsApp", { exact: false })).toBeVisible();
+  await expect(demo.getByText("Demo only. Nothing is added to a real khata.", { exact: false })).toBeVisible();
 });
 
 test("FAQ, privacy, pilot terms and workspace preview controls work", async ({ page }) => {

@@ -28,7 +28,11 @@ export type StoredDecision =
   | { kind: "find"; filters: FindFilters };
 
 export type Checkpoint = { transcript?: string; decision?: StoredDecision; replyText?: string; entryId?: string | null; pendingId?: string | null; replyWamid?: string };
-export type AgentDeps = { db: Firestore; ledger: LedgerService; parser: EvonParser | null; stt: SpeechToText | null; whatsapp: WhatsAppGateway; now?: () => number };
+export type AgentDeps = {
+  db: Firestore; ledger: LedgerService; parser: EvonParser | null; stt: SpeechToText | null; whatsapp: WhatsAppGateway; now?: () => number;
+  /** "web" = the in-app assistant: no WhatsApp opt-in/out commands, entries tagged source "assistant". */
+  channel?: "whatsapp" | "web";
+};
 
 const words = (t: string) => t.trim().split(/\s+/).filter(Boolean);
 const latin = (t: string) => transliterate(t).toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
@@ -41,6 +45,10 @@ export class VoiceAgent {
   private now: () => number;
   constructor(private deps: AgentDeps) {
     this.now = deps.now ?? Date.now;
+  }
+
+  private get web() {
+    return this.deps.channel === "web";
   }
 
   private shop(job: InboundPayload) {
@@ -69,7 +77,7 @@ export class VoiceAgent {
     if (!cp.decision) {
       let decision: StoredDecision;
       try {
-        decision = await this.decideFor(job, cp.transcript ?? "", owner.get("waOptedOut") === true);
+        decision = await this.decideFor(job, cp.transcript ?? "", this.web ? false : owner.get("waOptedOut") === true);
       } catch (error) {
         if (error instanceof InvalidModelOutput) decision = { kind: "reply", text: msg.invalidModel };
         else throw error; // ProviderUnavailable / Firestore errors -> job retry, nothing written
@@ -131,9 +139,11 @@ export class VoiceAgent {
 
   async decideFor(job: InboundPayload, transcript: string, optedOut: boolean): Promise<StoredDecision> {
     const text = latin(transcript);
-    if (/^(stop|band karo|bandh karo)$/.test(text)) return { kind: "opt", optedOut: true };
-    if (optedOut) return /^start$/.test(text) ? { kind: "opt", optedOut: false } : { kind: "none" };
-    if (/^start$/.test(text)) return { kind: "reply", text: msg.started };
+    if (!this.web) {
+      if (/^(stop|band karo|bandh karo)$/.test(text)) return { kind: "opt", optedOut: true };
+      if (optedOut) return /^start$/.test(text) ? { kind: "opt", optedOut: false } : { kind: "none" };
+      if (/^start$/.test(text)) return { kind: "reply", text: msg.started };
+    }
     if (/^(madad|help|menu)$/.test(text)) return { kind: "reply", text: msg.help() };
     if (!text) return { kind: "reply", text: job.messageType === "other" ? msg.unsupportedType : msg.unusableAudio };
 
@@ -237,7 +247,7 @@ export class VoiceAgent {
     const shop = this.shop(job);
     const pendings = shop.collection("pendingClarifications");
     const at = () => Timestamp.fromMillis(this.now());
-    const context = { source: "whatsapp" as const, sourceMessageId: job.wamid };
+    const context = { source: this.web ? ("assistant" as const) : ("whatsapp" as const), sourceMessageId: job.wamid };
     const claim = async (pendingId: string | null) => {
       if (!pendingId) return true;
       return db.runTransaction(async (tx) => {
@@ -317,7 +327,7 @@ export class VoiceAgent {
       }
       case "undo": {
         if (!(await claim(d.resolves))) return { text: msg.alreadyDone };
-        const reason = "Owner correction via WhatsApp";
+        const reason = this.web ? "Owner correction via voice assistant" : "Owner correction via WhatsApp";
         try {
           const r = (await ledger.executeWith(job.ownerUid!, d.entryId ? { action: "undo_entry", entryId: d.entryId, reason } : { action: "undo_last", reason }, this.key(job), context)) as {
             customerId: string; balancePaise: number; signedAmountPaise: number;

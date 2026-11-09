@@ -42,7 +42,7 @@ export function ActivityPanel({ shopId, customerName }: { shopId: string; custom
     <div className="stack">
       <section className="panel">
         <div className="panel-heading"><div><h2>Waiting for your answer</h2><p>Voice entries the agent paused on instead of guessing.</p></div><button className="icon-btn" aria-label="Refresh" onClick={pending.refresh}><RefreshCw size={16} /></button></div>
-        <State rows={pending.rows} error={pending.error} empty={<><span className="empty-icon"><MessageCircleQuestion size={22} /></span><h3>No open questions</h3><p>When something is unclear, the question you were asked on WhatsApp appears here.</p></>}>
+        <State rows={pending.rows} error={pending.error} empty={<><span className="empty-icon"><MessageCircleQuestion size={22} /></span><h3>No open questions</h3><p>When something you said was unclear, the assistant’s open question appears here.</p></>}>
           <ul className="history-list padded">
             {pending.rows?.map((p) => (
               <li key={p.id}><div><strong>{String(p.questionText).split("\n")[0]}</strong><small>“{String(p.originalTranscript).slice(0, 120)}” · expires {fmt(p.expiresAt)}</small></div><span className="entry-tag">{p.missingField}</span></li>

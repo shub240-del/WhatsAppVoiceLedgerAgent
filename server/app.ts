@@ -15,6 +15,9 @@ import { integrationStatuses, whatsappConfig } from "./config.js";
 import { ingestWebhook, verifySignature } from "./whatsapp/webhook.js";
 import { log } from "./log.js";
 import { drainQueue, type Runtime } from "./runtime.js";
+import { assistantDeps, runAssistantTurn, type AssistantDeps } from "./assistant.js";
+import { ProviderUnavailable } from "./agent/errors.js";
+import { GnaniAccountError } from "./gnani-stt.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
 const safeEqual = (a: string, b: string) => {
@@ -30,6 +33,8 @@ export type ApiOptions = {
    * processed right after Meta gets its 200, via the host's waitUntil. Without it, the worker does it.
    */
   background?: { schedule(task: Promise<unknown>): void; runtime(): Runtime | null; budgetMs?: number };
+  /** Injected parser/STT for tests; defaults to Gemini + Gnani from the environment. */
+  assistant?: AssistantDeps;
 };
 
 export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: string, options: ApiOptions = {}) {
@@ -89,6 +94,8 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
   });
 
   app.use(cors({ origin: allowedOrigin, methods: ["GET", "POST", "PATCH", "PUT"], allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "X-Request-Id"], exposedHeaders: ["X-Request-Id"] }));
+  // Voice clips (≤30 s WAV, base64) need a larger body than the rest of the API.
+  app.use("/api/assistant", express.json({ limit: "2mb" }));
   app.use(express.json({ limit: "16kb" }));
   const ledger = new LedgerService(store);
   const onboarding = new OnboardingService(store);
@@ -121,6 +128,12 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try { await handler(req, res); } catch (error) { next(error); }
     };
+  // In-app assistant: one voice or typed message in, one plain-text reply out.
+  let assistant: AssistantDeps | undefined;
+  app.post("/api/assistant", route(async (req, res) => {
+    assistant ??= options.assistant ?? assistantDeps(env);
+    res.json(await runAssistantTurn(store, res.locals.uid, req.body, assistant));
+  }));
   app.post("/api/onboarding/shop", route(async (req, res) => {
     const result = await onboarding.createShop(res.locals.uid, req.body);
     res.status(result.created ? 201 : 200).json(result);
@@ -164,6 +177,10 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (error instanceof z.ZodError) return res.status(400).json({ error: { code: "INVALID_INPUT", message: "The request fields are invalid." } });
     if (error instanceof ServiceError) return res.status(error.status).json({ error: { code: error.code, message: error.message } });
+    if (error instanceof ProviderUnavailable)
+      return res.status(503).json({ error: { code: "PROVIDER_UNAVAILABLE", message: "The voice service is busy right now. Nothing was saved; please try again." } });
+    if (error instanceof GnaniAccountError)
+      return res.status(503).json({ error: { code: "VOICE_ACCOUNT", message: "Voice is unavailable (Gnani account problem). Nothing was saved; you can type instead." } });
     if (error instanceof SyntaxError) return res.status(400).json({ error: { code: "INVALID_JSON", message: "Invalid JSON request." } });
     // Never return provider responses, transcripts, credentials or stack traces.
     log("error", "request_failed", { requestId: res.locals.requestId ?? null, error: error instanceof Error ? error.name : "UnknownError" });

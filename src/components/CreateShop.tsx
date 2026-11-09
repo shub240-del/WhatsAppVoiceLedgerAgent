@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { ArrowRight, LoaderCircle, MessageCircle, Store } from "lucide-react";
+import { ArrowRight, LoaderCircle, Mic, Store } from "lucide-react";
 import { api } from "../lib/api";
-import { toE164 } from "../lib/phone";
 
-/** Self-serve step: a signed-in owner names their shop and (optionally) links their WhatsApp number. */
+/** Self-serve step: a signed-in owner names their shop. */
 export function CreateShop({ onCreated, compact = false }: { onCreated(): void; compact?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -16,16 +15,9 @@ export function CreateShop({ onCreated, compact = false }: { onCreated(): void; 
       setError("Please enter your shop’s name.");
       return;
     }
-    let ownerPhone: string | null;
-    try {
-      ownerPhone = toE164(String(data.get("ownerPhone")));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Check the WhatsApp number.");
-      return;
-    }
     setBusy(true);
     try {
-      await api("/api/onboarding/shop", { shopName, ...(ownerPhone ? { ownerPhone } : {}) });
+      await api("/api/onboarding/shop", { shopName });
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Your shop could not be created. Try again.");
@@ -42,7 +34,7 @@ export function CreateShop({ onCreated, compact = false }: { onCreated(): void; 
           </span>
           <div>
             <h2>Name your shop to open your khata</h2>
-            <p>Takes 10 seconds. You can change these later in Settings.</p>
+            <p>Takes 10 seconds.</p>
           </div>
         </div>
       )}
@@ -51,13 +43,9 @@ export function CreateShop({ onCreated, compact = false }: { onCreated(): void; 
           Shop name
           <input name="shopName" required minLength={2} maxLength={80} placeholder="e.g. Sharma General Store" autoFocus />
         </label>
-        <label>
-          Your WhatsApp number <span className="subtle">(optional)</span>
-          <input name="ownerPhone" type="tel" inputMode="tel" placeholder="98765 43210" autoComplete="tel" />
-        </label>
         <p className="form-note">
-          <MessageCircle size={14} />
-          Voice notes from this number will go into your khata once WhatsApp is switched on.
+          <Mic size={14} />
+          Next, just speak or type your entries to the assistant on the Home screen.
         </p>
         {error && (
           <p className="form-error" role="alert">

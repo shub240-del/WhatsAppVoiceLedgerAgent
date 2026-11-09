@@ -82,6 +82,18 @@ New owners now create their own shop from the dashboard (`POST /api/onboarding/s
 Google account, tenant always taken from the verified token. `pnpm provision:owner` still works for
 manual setup.
 
+## 2b. In-app assistant (WhatsApp switched off)
+
+The assistant now lives in the website: Home screen → tap the mic (or type). The browser records
+16 kHz mono WAV (≤30 s), `POST /api/assistant` transcribes it with Gnani and runs the same agent
+the WhatsApp bot used (never guesses, asks one question, Undo within 10 minutes). Entries are tagged
+`source: "assistant"`. Needs `GNANI_API_KEY` for voice and `APP_GEMINI_API_KEY` + `APP_GEMINI_MODEL`
+to turn sentences into entries (without Gemini it replies that the AI parser is not configured).
+
+WhatsApp is switched off but its code is kept: `vercel.json` no longer routes `/webhooks/*`, and the
+queue drain only runs when `WHATSAPP_ENABLED=true`. The `META_*` variables can be deleted from Vercel.
+To re-enable, restore the `/webhooks/:path*` rewrite and set `WHATSAPP_ENABLED=true`.
+
 ## 3. Environment variables
 
 Frontend variables are public and bundled by Vite. Never put privileged secrets in them.

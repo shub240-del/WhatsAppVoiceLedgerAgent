@@ -42,8 +42,8 @@ const faqs = [
     "Keep customer names, credit, payments, balances, and entry history together in your shop dashboard. You’ll need an owner account and a shop linked through pilot onboarding.",
   ],
   [
-    "Can I add entries by WhatsApp voice today?",
-    "Not yet. The voice examples here are demos. Live WhatsApp voice needs provider setup and testing before it can be offered.",
+    "How do I add entries by voice?",
+    "Sign in, open your khata, tap the mic and speak, for example “Ramesh ko 340 ka udhaar likh do”. You can also type. If a name or amount is unclear, the assistant asks instead of guessing.",
   ],
   [
     "How do I get started?",
@@ -432,7 +432,7 @@ function VoiceDemo() {
       </div>
       <p className="demo-disclosure">
         <CircleCheck size={13} />
-        Demo only. Nothing is sent to WhatsApp or added to a real khata.
+        Demo only. Nothing is added to a real khata.
       </p>
     </div>
   );
@@ -683,7 +683,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
               {
                 n: "01",
                 title: "Record credit or payment.",
-                copy: "Add transactions quickly through your dashboard, or via voice note in supported pilot shops.",
+                copy: "Add transactions by speaking or typing to the assistant in your khata.",
                 icon: Mic,
                 foot: "Fast and straightforward",
               },
@@ -822,8 +822,8 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
           <div className="voice-pilot-note">
             <Mic size={16} />
             <p>
-              <strong>Voice entry is not live yet.</strong> WhatsApp and voice services need setup
-              and testing. For now, pilot shops can record entries in the dashboard.
+              <strong>Speak right inside Udhaar.</strong> Tap the mic on your khata’s Home screen and
+              say the entry, or type it. Every entry can be undone, and nothing is ever erased.
             </p>
           </div>
         </section>
@@ -1074,8 +1074,8 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
                 </p>
                 <h3>What’s available</h3>
                 <p>
-                  Dashboard access depends on your shop being set up. WhatsApp voice entry is not
-                  live yet. Udhaar does not send automatic customer reminders.
+                  After you sign in and name your shop, you can speak or type entries in the website.
+                  Udhaar does not send automatic customer reminders.
                 </p>
                 <h3>Keep your account safe</h3>
                 <p>

@@ -6,10 +6,6 @@
       "destination": "/api"
     },
     {
-      "source": "/webhooks/:path*",
-      "destination": "/api"
-    },
-    {
       "source": "/health",
       "destination": "/api"
     }

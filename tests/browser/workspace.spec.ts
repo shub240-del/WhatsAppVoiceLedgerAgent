@@ -18,9 +18,11 @@ test("private workspace, navigation, login dialog and honest integration states"
   await expect(dialog).not.toBeVisible();
   await page.getByRole("button", { name: "Explore voice commands" }).click();
   await expect(
-    page.getByText("These are examples, not processed messages.", { exact: false }),
+    page.getByText("Say these to the assistant on your Home screen", { exact: false }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "View connections", exact: true }).click();
+  await page.getByRole("button", { name: "Go to the assistant", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Your khata, at a glance." })).toBeVisible();
+  await page.goto("/#/workspace/connections");
   await expect(page.getByRole("heading", { name: "Connections and setup status." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Status not verified yet" })).toBeVisible();
   await expect(
@@ -32,7 +34,7 @@ test("private workspace, navigation, login dialog and honest integration states"
   await expect(page.getByText("No entries yet.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Download CSV" })).toBeDisabled();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Your WhatsApp number" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your shop" })).toBeVisible();
   await page.getByRole("button", { name: "Sunday reminders" }).click();
   await expect(page.getByRole("heading", { name: "Reminders, held until approved." })).toBeVisible();
   expect(errors).toEqual([]);

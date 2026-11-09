@@ -9,7 +9,8 @@ or backend credentials were configured. This implementation uses Firebase only:
 - Firebase Admin SDK: trusted Node.js API for all mutations and ledger tools.
 - Firestore transactions: financial entry + balance + audit + idempotency + reversal.
 - No analytics, Cloud Functions, Storage, scheduler, payment links, or provider network calls.
-- No billing enabled, infrastructure created, rules published, or services deployed by this change.
+- GitHub Actions can deploy the built static frontend to Firebase Hosting on manual dispatch.
+- The Express API is not deployed by that workflow and still needs a separately configured Node.js runtime.
 
 The supplied **public web config** is the default in `src/lib/firebase.ts`.
 It is not an Admin credential. Environment variables can override it for other environments.
@@ -28,7 +29,9 @@ have been configured in the console.
 - [ ] Review and publish `firestore.rules`. Never use test-mode public access rules.
 - [ ] Create the indexes in `firestore.indexes.json`.
 - [ ] Run local tests against an emulator, not production.
-- [ ] Arrange a trusted Node.js API runtime. Hosting/deployment and any paid services need separate approval.
+- [ ] Add a narrowly scoped service account JSON as the GitHub repository secret `FIREBASE_SERVICE_ACCOUNT`; never paste or commit it.
+- [ ] Confirm the production Hosting domain in Firebase Authentication's authorized domains and the Google OAuth client.
+- [ ] Arrange a trusted Node.js API runtime. Static Hosting does not deploy the API or enable ledger mutations.
 - [ ] Provision owner membership using the administrator command below.
 - [ ] Configure the frontend API URL and exact allowed origin.
 - [ ] Configure a real human support contact before any WhatsApp launch.
@@ -37,7 +40,22 @@ Email/Password is intentionally disabled; the frontend uses Google sign-in. Phon
 **not implemented or enabled**. There is no public signup-to-shop flow and no client ability
 to choose its tenant.
 
-## 2. Environment variables
+## 2. GitHub frontend deployment
+
+The manually triggered workflow at `.github/workflows/deploy-hosting.yml` runs unit tests,
+TypeScript checks and a production build before deploying `dist/` to the live Firebase
+Hosting channel. It requires the repository secret `FIREBASE_SERVICE_ACCOUNT` containing
+service-account JSON with permission to deploy Firebase Hosting to `udhar-khata-f41fb`.
+Configure the secret in the repository's Settings → Secrets and variables → Actions; do not
+send credentials in chat or commit them. Then run **Deploy frontend to Firebase Hosting**
+from the repository's Actions tab.
+
+This publishes only the Vite frontend. The Express API, its Admin SDK credentials, CORS
+origin and frontend `VITE_API_BASE_URL` must be configured and deployed separately before
+authenticated ledger mutations can work in production. Do not treat a successful Hosting
+deployment as a complete backend deployment.
+
+## 3. Environment variables
 
 Frontend variables are public and bundled by Vite. Never put privileged secrets in them.
 

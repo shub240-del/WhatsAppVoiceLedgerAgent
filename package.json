@@ -27,6 +27,7 @@
     "test:all": "pnpm typecheck && pnpm test && pnpm test:memory && pnpm build"
   },
   "dependencies": {
+    "@fontsource/mukta": "5",
     "@google/genai": "^3.0.0",
     "@vercel/functions": "3.11.1",
     "cors": "^2.8.6",

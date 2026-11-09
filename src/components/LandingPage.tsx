@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AudioLines, Check, Mic, Undo2 } from "lucide-react";
 import { Modal } from "./Modal";
+import { AuthForm } from "./AuthDialog";
+import { WhatsAppPreview } from "./WhatsAppPreview";
 import "@fontsource/mukta/400.css";
 import "@fontsource/mukta/600.css";
 import "@fontsource/mukta/700.css";
@@ -185,7 +187,7 @@ function Demo() {
             <span className="l-dot" aria-hidden="true" />
             Udhaar assistant
           </div>
-          <div className="l-chat" aria-live="polite" ref={chat} tabIndex={0} aria-label="Demo messages">
+          <div className="l-chat" role="log" aria-live="polite" ref={chat} tabIndex={0} aria-label="Demo messages">
             {steps.map((s, i) =>
               s.from === "owner" ? (
                 <p key={i} className="l-msg owner">
@@ -336,6 +338,7 @@ const FAQS = [
 
 export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): void }) {
   const [policy, setPolicy] = useState<"privacy" | "terms" | null>(null);
+  const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
   return (
     <div className="l-page">
       <a className="skip-link" href="#main-content">
@@ -364,27 +367,27 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
 
       <main id="main-content">
         <section className="l-hero l-wrap">
-          <p className="l-kicker">Voice khata for kirana shops</p>
-          <h1>Bolo. Udhaar likh gaya.</h1>
-          <p className="l-lead">
-            Diary band karo. Say “Ramesh ko 340 ka udhaar” and Udhaar writes it in Ramesh’s khata, with the new
-            balance — in your own language.
-          </p>
-          <div className="l-cta">
-            <button className="l-btn l-btn-primary l-btn-lg" onClick={onStart}>
-              Try it free
-            </button>
-            <a className="l-btn l-btn-ghost l-btn-lg" href="#demo">
-              See the demo
-            </a>
+          <div className="l-hero-copy">
+            <p className="l-kicker">Voice khata for kirana shops</p>
+            <h1>Bolo. Udhaar likh gaya.</h1>
+            <p className="l-lead">
+              Diary band karo. Say “Ramesh ko 340 ka udhaar” and Udhaar writes it in Ramesh’s khata, with the new
+              balance — in your own language.
+            </p>
+            <ul className="l-langs" aria-label="Languages">
+              <li lang="hi-Latn">Hinglish</li>
+              <li lang="mr">मराठी</li>
+              <li lang="gu">ગુજરાતી</li>
+            </ul>
+            <div className="l-signup" id="signup">
+              <h2>{authMode === "signup" ? "Open your free khata" : "Log in to your khata"}</h2>
+              <AuthForm mode={authMode} onModeChange={setAuthMode} compact />
+              <button className="l-try" onClick={onStart}>
+                Or try it first, without an account
+              </button>
+            </div>
           </div>
-          <p className="l-note">No sign-up to try. Works in your phone’s browser.</p>
-          <ul className="l-langs" aria-label="Languages">
-            <li lang="hi-Latn">Hinglish</li>
-            <li lang="mr">मराठी</li>
-            <li lang="gu">ગુજરાતી</li>
-          </ul>
-          <ProductFrame />
+          <WhatsAppPreview />
         </section>
 
         <section className="l-section l-wrap l-problem" aria-labelledby="problem-title">
@@ -406,6 +409,14 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
         <div className="l-wrap">
           <Demo />
         </div>
+
+        <section className="l-section l-wrap" aria-labelledby="web-title">
+          <div className="l-section-head">
+            <h2 id="web-title">Every entry lands in your khata</h2>
+            <p>Open it on any phone or computer: who owes what, every entry, one-tap WhatsApp reminders.</p>
+          </div>
+          <ProductFrame />
+        </section>
 
         <section className="l-section l-wrap" id="how" aria-labelledby="how-title">
           <div className="l-section-head">

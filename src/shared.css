@@ -10,3 +10,4 @@
 .auth-divider { display: flex; align-items: center; gap: 10px; color: #5d5d66; font-size: 12px; }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: #e6e6e9; }
 .auth-forgot { justify-self: start; font-size: 13px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

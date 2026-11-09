@@ -15,6 +15,10 @@ export function authErrorMessage(error: unknown) {
       return "An account already exists with this email using another sign-in method. Contact your onboarding administrator.";
     case "auth/popup-blocked":
       return "Your browser blocked the Google sign-in window. Allow pop-ups for this site and try again.";
+    case "auth/popup-closed-by-user":
+    case "auth/cancelled-popup-request":
+    case "auth/user-cancelled":
+      return "Google sign-in was closed before it finished. You can try again whenever you’re ready.";
     case "auth/redirect-cancelled-by-user":
       return "Google sign-in was cancelled. You can try again whenever you’re ready.";
     case "auth/redirect-operation-pending":

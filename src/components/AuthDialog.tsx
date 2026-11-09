@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getAdditionalUserInfo } from "firebase/auth";
 import {
   ArrowRight,
   Check,
@@ -26,7 +27,11 @@ export function AuthDialog({
     setError("");
     setBusy(true);
     try {
-      await beginGoogleSignIn();
+      const credential = await beginGoogleSignIn();
+      const newUser = getAdditionalUserInfo(credential)?.isNewUser;
+      setBusy(false);
+      close();
+      window.location.hash = newUser ? "/workspace?setup=1" : "/workspace";
     } catch (e) {
       setError(authErrorMessage(e));
       setBusy(false);

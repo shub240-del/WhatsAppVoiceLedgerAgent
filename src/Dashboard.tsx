@@ -195,6 +195,8 @@ export default function Dashboard() {
     setError("");
     try {
       await beginGoogleSignIn();
+      setBusy(false);
+      setDialog(null);
     } catch (e) {
       setError(authErrorMessage(e));
       setBusy(false);

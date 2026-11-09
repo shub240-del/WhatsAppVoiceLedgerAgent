@@ -1,4 +1,4 @@
-// Deterministic, integer-only amount parsing for Hindi, Hinglish and English.
+// Deterministic, integer-only amount parsing for Hindi, Hinglish, English, Marathi and Gujarati.
 // All arithmetic happens in paise. The model's amount is never trusted without
 // an independent server parse of the quoted transcript phrase.
 
@@ -29,6 +29,16 @@ const VARIANTS: Record<string, number> = {
   "एक": 1, "दो": 2, "तीन": 3, "चार": 4, "पांच": 5, "पाँच": 5, "छह": 6, "छः": 6, "सात": 7,
   "आठ": 8, "नौ": 9, "दस": 10, "बीस": 20, "पच्चीस": 25, "तीस": 30, "चालीस": 40, "पचास": 50,
   "साठ": 60, "सत्तर": 70, "अस्सी": 80, "नब्बे": 90,
+  // Marathi (romanised as Gnani/LLMs transcribe it). "-she" = hundreds: ekshe vees = 120.
+  don: 2, paach: 5, saha: 6, daha: 10, akra: 11, pandhra: 15, athra: 18, ekonis: 19, vees: 20,
+  ekvees: 21, pannas: 50, ainshi: 80, aenshi: 80, navvad: 90, shambhar: 100,
+  ekshe: 100, donshe: 200, teenshe: 300, charshe: 400, chaarshe: 400, paachshe: 500, sahashe: 600,
+  satshe: 700, saatshe: 700, aathshe: 800, naushe: 900, dedhshe: 150, adichshe: 250,
+  // Gujarati. "-so" = hundreds: basso = 200, panchso = 500.
+  be: 2, tran: 3, chha: 6, nav: 9, agiyar: 11, ter: 13, chaud: 14, pandar: 15, sol: 16,
+  trees: 30, sitter: 70, sittar: 70, ensi: 80, nevu: 90,
+  ekso: 100, basso: 200, transo: 300, charso: 400, panchso: 500, chhaso: 600,
+  satso: 700, athso: 800, navso: 900, dodhso: 150, adhiso: 250,
 };
 const MULTIPLIERS: Record<string, number> = {
   sau: 100, hundred: 100, "सौ": 100,
@@ -39,9 +49,22 @@ const MULTIPLIERS: Record<string, number> = {
 // Fractions in paise-of-one-unit: dhai = 2.5, dedh = 1.5.
 const FRACTIONS: Record<string, number> = { dhai: 250, dhaai: 250, dedh: 150, dedth: 150, "ढाई": 250, "डेढ़": 150 };
 const MODIFIERS: Record<string, number> = { saade: 50, sade: 50, sadhe: 50, "साढ़े": 50, sava: 25, savaa: 25, "सवा": 25, paune: -25, "पौने": -25 };
-const CURRENCY = new Set(["rupaye", "rupay", "rupee", "rupees", "rupiya", "rupiye", "rs", "inr", "₹", "रुपये", "रुपए", "रुपया"]);
-// Words that are also common non-number words ("likh do", "ke saath").
-const WEAK = new Set(["do", "ek", "sath", "saath", "one", "दो", "एक"]);
+const CURRENCY = new Set([
+  "rupaye", "rupay", "rupee", "rupees", "rupiya", "rupiye", "rupya", "rupaya", "rupaiya", "rupyache", "rs", "inr", "₹",
+  "रुपये", "रुपए", "रुपया",
+]);
+// Words that are also common non-number words ("likh do", "ke saath", Gujarati "be", Marathi "don").
+const WEAK = new Set(["do", "ek", "sath", "saath", "one", "be", "don", "bar", "sol", "ter", "nav", "दो", "एक"]);
+// A number directly followed by a unit is a quantity ("teen packet", "do kilo"), never the amount.
+const UNITS = new Set([
+  "kilo", "kg", "kgs", "kilogram", "gram", "grams", "gm", "gms", "g", "litre", "liter", "litres", "ltr", "lit",
+  "ml", "packet", "packets", "pkt", "pack", "dozen", "darjan", "piece", "pieces", "pcs", "pc", "nag", "bottle",
+  "bottles", "bori", "bag", "bags", "thaili", "box", "dabba", "dabbe", "pav", "pao", "paav", "meter", "metre",
+  "plate", "cup", "glass", "jar", "pouch", "tin", "strip", "tablet", "tablets", "anda", "ande", "egg", "eggs",
+  "किलो", "पैकेट", "लीटर", "दर्जन",
+]);
+// Words that mark the following number as the bill total ("total 340", "kul 85").
+const TOTAL_MARKERS = new Set(["total", "totel", "tottal", "kul", "ekun", "kul milakar", "टोटल", "कुल"]);
 
 function squash(word: string) {
   return word.replace(/aa/g, "a").replace(/ee/g, "i").replace(/ii/g, "i").replace(/oo/g, "u").replace(/w/g, "v");
@@ -66,19 +89,33 @@ function lookup(token: string, table: Record<string, number>) {
   return table[token] ?? table[squash(token)];
 }
 
-type Group = { paise: number; weakOnly: boolean; currency: boolean };
+type Group = { paise: number; weakOnly: boolean; currency: boolean; marked: boolean };
 
 /** Extracts every distinct amount mentioned in a phrase, in paise. */
 export function extractAmounts(text: string): number[] {
   const groups: Group[] = [];
   let total = 0, current = 0, active = false, weakOnly = true, modifier = 0, hasDigits = false;
+  let marked = false, previous = "";
+  const reset = () => {
+    total = 0; current = 0; active = false; weakOnly = true; modifier = 0; hasDigits = false; marked = false;
+  };
   const close = (currency = false) => {
-    if (active) groups.push({ paise: total + current, weakOnly, currency });
-    total = 0; current = 0; active = false; weakOnly = true; modifier = 0; hasDigits = false;
+    if (active) groups.push({ paise: total + current, weakOnly, currency, marked: marked || currency });
+    reset();
+  };
+  const start = () => {
+    if (!active) marked = TOTAL_MARKERS.has(previous);
   };
   for (const token of tokenize(text)) {
+    if (UNITS.has(token)) {
+      // Quantity, not money: "teen packet", "2 kg". Drop the group instead of recording it.
+      if (active) reset();
+      previous = token;
+      continue;
+    }
     if (/^\d{1,12}(\.\d{1,2})?$/.test(token)) {
       if (hasDigits || current !== 0) close();
+      start();
       const [whole, fraction = ""] = token.split(".");
       current = Number(whole) * 100 + Number(fraction.padEnd(2, "0")) + modifier;
       modifier = 0; active = true; weakOnly = false; hasDigits = true;
@@ -90,8 +127,9 @@ export function extractAmounts(text: string): number[] {
     const fraction = lookup(token, FRACTIONS);
     const mod = lookup(token, MODIFIERS);
     if (mod !== undefined) { modifier = mod; continue; }
-    if (fraction !== undefined) { current += fraction; active = true; weakOnly = false; continue; }
+    if (fraction !== undefined) { start(); current += fraction; active = true; weakOnly = false; continue; }
     if (number !== undefined) {
+      start();
       current += number * 100 + modifier;
       modifier = 0; active = true;
       if (!WEAK.has(token) && !WEAK.has(squash(token))) weakOnly = false;
@@ -107,10 +145,17 @@ export function extractAmounts(text: string): number[] {
       continue;
     }
     close(CURRENCY.has(token));
+    previous = token;
   }
   close();
-  const values = groups.filter((g) => g.paise > 0 && (!g.weakOnly || g.currency)).map((g) => g.paise);
-  return [...new Set(values)];
+  const kept = groups.filter((g) => g.paise > 0 && (!g.weakOnly || g.currency));
+  // Several numbers but exactly one marked as money ("… 2 Fortune tel, total 360"): that one is the amount.
+  const values = [...new Set(kept.map((g) => g.paise))];
+  if (values.length > 1) {
+    const markedValues = [...new Set(kept.filter((g) => g.marked).map((g) => g.paise))];
+    if (markedValues.length === 1) return markedValues;
+  }
+  return values;
 }
 
 /** Returns the single amount in a phrase, or null when absent or ambiguous. */

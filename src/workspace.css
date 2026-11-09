@@ -891,3 +891,52 @@
   .assistant { padding: 14px; }
   .bubble { max-width: 92%; }
 }
+
+.language-setting {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.language-setting select {
+  height: 42px;
+  border: 1px solid #d9e2d6;
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 14px;
+  background: #fff;
+}
+.language-setting small {
+  font-weight: 400;
+}
+
+.eval-list {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.eval-list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f4f7f2;
+  font-size: 13px;
+}
+.eval-list li.fail {
+  background: #fdecea;
+}
+.eval-list li.pass svg {
+  color: #2f7a4a;
+}
+.eval-list li.fail svg {
+  color: #b03a2e;
+}
+.eval-list small {
+  display: block;
+  color: #5d6b5f;
+}

@@ -48,3 +48,23 @@ test("Indian digit grouping for confirmations", () => {
   assert.equal(formatRupees(35050), "₹350.50");
   assert.equal(formatRupees(-1000), "-₹10");
 });
+
+test("quantities with units are not amounts; marked totals win", async () => {
+  const { extractAmounts } = await import("../../server/money-words");
+  const rupees = (t: string) => extractAmounts(t).map((p) => p / 100);
+  assert.deepEqual(rupees("Ramesh ne do kilo chawal aur ek Surf liya, udhaar mein, total 340"), [340]);
+  assert.deepEqual(rupees("Sunita didi ne teen packet Parle-G aur ek litre doodh liya, 85 rupaye, udhaar"), [85]);
+  assert.deepEqual(rupees("paanch kilo aata 250 rupaye Ramesh"), [250]);
+  assert.deepEqual(rupees("2 kg cheeni aur 1 dozen ande, kul 180"), [180]);
+  assert.deepEqual(rupees("Ramesh bhaiya 2 Fortune tel 360"), [2, 360]); // unclear: the bot asks
+});
+
+test("Marathi and Gujarati amounts", async () => {
+  const { extractAmounts } = await import("../../server/money-words");
+  const rupees = (t: string) => extractAmounts(t).map((p) => p / 100);
+  assert.deepEqual(rupees("Ganesh ne don kilo saakhar ghetli, ekshe vees rupaye baaki"), [120]);
+  assert.deepEqual(rupees("paachshe rupaye dile"), [500]);
+  assert.deepEqual(rupees("don hajar rupaye"), [2000]);
+  assert.deepEqual(rupees("Bhavesh e basso rupiya aapya"), [200]);
+  assert.deepEqual(rupees("panchso pachas rupiya"), [550]);
+});

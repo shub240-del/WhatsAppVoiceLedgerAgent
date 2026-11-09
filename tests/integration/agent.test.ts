@@ -53,7 +53,7 @@ beforeEach(async () => {
 test("E2E credit: webhook -> queue -> EVON -> validation -> Firestore -> exact confirmation", async () => {
   parser.script["Sunita ko 340 rupaye ka udhaar likh do"] = credit("sunita", "Sunita", 340);
   const { wamid, reply } = await send("Sunita ko 340 rupaye ka udhaar likh do");
-  assert.equal(reply, "Sunita ji ke account mein ₹340 add kiye gaye. Ab total baaki ₹1,600 hai. Galti ho to is message ko reply karke 'GALAT' likhein.");
+  assert.equal(reply, "Sunita: +₹340. Total baaki: ₹1,600. Galat ho to 'GALAT' likhein (10 minute ke andar).");
   const [e] = await entries();
   assert.equal(e.signedAmountPaise, 34000);
   assert.equal(e.source, "whatsapp");
@@ -73,7 +73,7 @@ test("same webhook delivered twice creates one entry and one reply", async () =>
 test("payment 200 against 1,260 leaves 1,060", async () => {
   parser.script["Sunita ne 200 diye"] = credit("sunita", "Sunita", 200, "add_payment");
   const { reply } = await send("Sunita ne 200 diye");
-  assert.match(reply, /₹200 mile\. Ab baaki ₹1,060/);
+  assert.match(reply, /₹200 mile\. Total baaki: ₹1,060/);
   assert.equal(await balance("sunita"), 106000);
 });
 test("balance query is read-only and lists recent entries", async () => {
@@ -138,7 +138,7 @@ test("payment above balance requires an explicit advance confirmation", async ()
   assert.match(ask.reply, /Advance maanein/);
   assert.equal((await entries()).length, 0);
   const { reply } = await send("1");
-  assert.match(reply, /₹100 mile\. Ab baaki -₹100/);
+  assert.match(reply, /₹100 mile\. Total baaki: -₹100/);
   assert.equal(await balance("ramesh-2"), -10000);
 });
 test("amount above the per-entry cap requires explicit confirmation; 'nahi' writes nothing", async () => {

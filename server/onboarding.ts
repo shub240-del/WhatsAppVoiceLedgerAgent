@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Timestamp, type Firestore } from "firebase-admin/firestore";
 import { z } from "zod";
 import { documentId, ensure } from "./domain.js";
+import { SHOP_LANGUAGES } from "./languages.js";
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/);
 const shopInput = z
@@ -11,6 +12,10 @@ const shopInput = z
   })
   .strict();
 const phoneInput = z.object({ ownerPhone: phoneSchema.nullable() }).strict();
+const shopUpdate = z
+  .object({ name: z.string().trim().min(2).max(80).optional(), language: z.enum(SHOP_LANGUAGES).optional() })
+  .strict()
+  .refine((v) => v.name !== undefined || v.language !== undefined, "Nothing to update.");
 
 /**
  * Self-serve onboarding: a signed-in Google user creates exactly one shop that they own.
@@ -108,6 +113,20 @@ export class OnboardingService {
       });
       return { ownerPhone };
     });
+  }
+
+  /** Owner-only shop settings: name and language (drives speech-to-text language hints). */
+  async updateShop(uid: string, input: unknown) {
+    const data = shopUpdate.parse(input);
+    const owner = await this.db.doc(`owners/${documentId.parse(uid)}`).get();
+    ensure(owner.exists && owner.get("active") === true && owner.get("role") === "owner", 403, "OWNER_REQUIRED", "Create your shop first.");
+    const shopId = owner.get("shopId") as string;
+    const at = Timestamp.now();
+    await this.db.doc(`shops/${shopId}`).update({ ...data, updatedAt: at });
+    await this.db.doc(`shops/${shopId}/auditLogs/${randomUUID()}`).create({
+      shopId, action: "update_shop", actorId: uid, targetId: shopId, after: data, createdAt: at,
+    });
+    return { shopId, ...data };
   }
 
   async ownerPhone(uid: string) {

@@ -44,7 +44,7 @@ test("invalid settings are reported without echoing the key", () => {
 test("transcribe sends the documented multipart request and maps the response", async () => {
   const seen: { url?: string; headers?: Headers; form?: FormData } = {};
   const stt = new GnaniSpeechToText(config, fakeFetch(200, { success: true, transcript: " रमेश को 340 का उधार ", detected_language_code: "hi-IN" }, seen));
-  const out = await stt.transcribe(new Uint8Array([1, 2, 3]), ["hi-IN"], "audio/ogg; codecs=opus");
+  const out = await stt.transcribe(new Uint8Array([1, 2, 3]), [], "audio/ogg; codecs=opus");
   assert.deepEqual(out, { text: "रमेश को 340 का उधार", language: "hi-IN", confidence: null, durationMs: null });
   assert.equal(seen.url, "https://api.vachana.ai/stt/v3");
   assert.equal(seen.headers?.get("X-API-Key-ID"), KEY);
@@ -74,4 +74,16 @@ test("live key check: silence accepted means the key works; 401 means it does no
   const wav = silentWav();
   assert.equal(Buffer.from(wav.slice(0, 4)).toString(), "RIFF");
   assert.equal(wav.byteLength, 44 + 16_000 * 2);
+});
+
+test("shop language hints are sent to Gnani (Marathi shop), invalid hints fall back to the default", async () => {
+  const { sttLanguages } = await import("../../server/languages");
+  const seen: { form?: FormData } = {};
+  const stt = new GnaniSpeechToText(config, fakeFetch(200, { success: true, transcript: "Ganesh ne don kilo saakhar ghetli" }, seen));
+  await stt.transcribe(new Uint8Array([1]), sttLanguages("mr"), "audio/wav");
+  assert.equal(seen.form?.get("language_code"), "mr-IN,hi-IN,en-IN");
+  await stt.transcribe(new Uint8Array([1]), ["xx-YY"], "audio/wav");
+  assert.equal(seen.form?.get("language_code"), "hi-IN,en-IN");
+  assert.deepEqual(sttLanguages("gu"), ["gu-IN", "hi-IN", "en-IN"]);
+  assert.deepEqual(sttLanguages(undefined), ["hi-IN", "en-IN"]);
 });

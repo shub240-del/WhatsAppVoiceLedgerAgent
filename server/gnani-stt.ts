@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { SpeechToText, Transcript } from "./adapters.js";
 import { ProviderUnavailable, UnusableAudio } from "./agent/errors.js";
-import type { GnaniSttConfig } from "./gnani-config.js";
+import { GNANI_LANGUAGES, type GnaniSttConfig } from "./gnani-config.js";
 
 type Fetch = typeof fetch;
 
@@ -26,13 +26,16 @@ const EXT: Record<string, string> = {
 export class GnaniSpeechToText implements SpeechToText {
   constructor(private config: GnaniSttConfig, private fetchImpl: Fetch = fetch) {}
 
-  async transcribe(audio: Uint8Array, _languageHints: string[], mimeType: string): Promise<Transcript> {
+  async transcribe(audio: Uint8Array, languageHints: string[], mimeType: string): Promise<Transcript> {
     const mime = mimeType.split(";")[0].trim().toLowerCase();
     const ext = EXT[mime];
     if (!ext) throw new UnusableAudio("unsupported_type");
     const form = new FormData();
     form.append("audio_file", new Blob([audio], { type: mime }), `voice.${ext}`);
-    form.append("language_code", this.config.languages.join(","));
+    // Per-shop hints (e.g. Marathi shop: mr-IN,hi-IN,en-IN) when valid for the model, else the configured default.
+    const max = this.config.model === "prisma-v2.5" ? 1 : 4;
+    const hints = languageHints.filter((l) => (GNANI_LANGUAGES as readonly string[]).includes(l)).slice(0, max);
+    form.append("language_code", (hints.length ? hints : this.config.languages).join(","));
     if (this.config.model !== "prisma-v2.5") form.append("model", this.config.model);
     form.append("format", this.config.format);
 

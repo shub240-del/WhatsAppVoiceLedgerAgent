@@ -9,9 +9,11 @@ import { LedgerService } from "./ledger.js";
 import { OnboardingService } from "./onboarding.js";
 import { gnaniSttConfig } from "./gnani-config.js";
 import { verifyGnaniKey } from "./gnani-stt.js";
+import { GeminiParser } from "./agent/gemini.js";
+import { EVAL_CASES, runParserEval } from "./eval/parser-cases.js";
 import { ServiceError, ensure } from "./domain.js";
 import { reminderPolicy } from "./adapters.js";
-import { integrationStatuses, whatsappConfig } from "./config.js";
+import { geminiConfig, integrationStatuses, whatsappConfig } from "./config.js";
 import { ingestWebhook, verifySignature } from "./whatsapp/webhook.js";
 import { log } from "./log.js";
 import { drainQueue, type Runtime } from "./runtime.js";
@@ -138,6 +140,9 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
     const result = await onboarding.createShop(res.locals.uid, req.body);
     res.status(result.created ? 201 : 200).json(result);
   }));
+  app.patch("/api/shop", route(async (req, res) => {
+    res.json(await onboarding.updateShop(res.locals.uid, req.body));
+  }));
   app.get("/api/owner/phone", route(async (_req, res) => {
     res.json(await onboarding.ownerPhone(res.locals.uid));
   }));
@@ -166,6 +171,18 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
     const { config, problems } = gnaniSttConfig(env);
     if (!config) return res.json({ ok: false, reason: "not_configured", detail: problems.join(" ") });
     res.json(await verifyGnaniKey(config));
+  }));
+  // Live AI accuracy test (spec section 9): runs the 16 fixed cases through Gemini + server validation.
+  // Batches of 4 keep each request well under the 60 s function limit and the free-tier rate limit.
+  app.post("/api/integrations/gemini/eval", route(async (req, res) => {
+    const owner = await store.doc(`owners/${res.locals.uid}`).get();
+    ensure(owner.exists && owner.get("active") === true, 403, "OWNER_REQUIRED", "Create your shop first.");
+    const batch = z.object({ batch: z.number().int().min(0).max(10) }).strict().parse(req.body).batch;
+    const { config, status } = geminiConfig(env);
+    if (!config) return res.json({ total: EVAL_CASES.length, batches: Math.ceil(EVAL_CASES.length / 4), results: [], problem: status.detail });
+    const cases = EVAL_CASES.slice(batch * 4, batch * 4 + 4);
+    const results = await runParserEval(options.assistant?.parser ?? new GeminiParser(config), cases, 500);
+    res.json({ total: EVAL_CASES.length, batches: Math.ceil(EVAL_CASES.length / 4), model: config.model, results });
   }));
   app.get("/api/connection", route(async (_req, res) => {
     const owner = await store.doc(`owners/${res.locals.uid}`).get();

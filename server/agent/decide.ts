@@ -1,5 +1,5 @@
 import { extractAmounts, parseAmountPhrase } from "../money-words.js";
-import { phraseInTranscript, resolveCustomer, type MatchCustomer } from "../matching.js";
+import { normalizeName, phraseInTranscript, resolveCustomer, type MatchCustomer } from "../matching.js";
 import type { Proposal } from "./schema.js";
 
 export type OpState = {
@@ -56,6 +56,19 @@ function resolveFor(p: Proposal, transcript: string, customers: MatchCustomer[])
   return { customerId: null, options: resolution.options };
 }
 
+/** How many distinct customer names (or aliases) appear as whole words in the transcript. */
+function namedCustomers(transcript: string, customers: MatchCustomer[]) {
+  const words = new Set(normalizeName(transcript).split(" "));
+  const names = new Set<string>();
+  for (const c of customers) {
+    for (const n of [c.name, ...(c.aliases ?? [])]) {
+      const parts = normalizeName(n).split(" ").filter(Boolean);
+      if (parts.length && parts.every((w) => words.has(w))) names.add(normalizeName(c.name));
+    }
+  }
+  return names.size;
+}
+
 export function decide(p: Proposal, transcript: string, customers: MatchCustomer[]): Decision {
   const spokenAmounts = extractAmounts(transcript);
   switch (p.action) {
@@ -72,9 +85,10 @@ export function decide(p: Proposal, transcript: string, customers: MatchCustomer
     case "add_credit":
     case "add_payment":
     case "ask_clarification": {
-      if (spokenAmounts.length > 1) return { kind: "reject", reason: "multiple" };
+      // Two amounts for two different known customers is two entries in one message: refuse, whatever the model says.
+      if (spokenAmounts.length > 1 && namedCustomers(transcript, customers) > 1) return { kind: "reject", reason: "multiple" };
       if (p.action === "ask_clarification" && p.missing !== "amount" && p.missing !== "customer") {
-        return { kind: "reject", reason: "unsupported" };
+        return { kind: "reject", reason: spokenAmounts.length > 1 ? "multiple" : "unsupported" };
       }
       const { customerId, options } = resolveFor(p, transcript, customers);
       let amountPaise: number | null = null;
@@ -82,7 +96,8 @@ export function decide(p: Proposal, transcript: string, customers: MatchCustomer
       if (phrase && phraseInTranscript(phrase, transcript)) {
         const parsed = parseAmountPhrase(phrase);
         // Model amount, quoted phrase and the transcript-wide parse must all agree.
-        if (parsed !== null && parsed === p.amount_paise && spokenAmounts[0] === parsed) amountPaise = parsed;
+        // With several unmarked numbers ("2 Fortune tel 360") nothing is accepted: the owner is asked.
+        if (parsed !== null && parsed === p.amount_paise && spokenAmounts.length === 1 && spokenAmounts[0] === parsed) amountPaise = parsed;
       }
       const action = p.action === "ask_clarification" ? p.intent : p.action;
       if (!action) return { kind: "reject", reason: "unsupported" };

@@ -74,3 +74,17 @@ test("find_entries converts IST dates and keeps undo purpose", () => {
 test("undo_entry without a chosen option routes to a search, never a blind undo", () => {
   assert.equal(decide(base({ action: "undo_entry" }), "woh wala hata do", customers).kind, "find");
 });
+test("quantities are not amounts: 'teen packet … 85 rupaye' records 85", () => {
+  const t = "Sunita didi ne teen packet Parle-G aur ek litre doodh liya, 85 rupaye, udhaar";
+  const d = decide(base({ customer_candidate_id: "s1", amount_paise: 8500, items: "3 packet Parle-G, 1 litre doodh", evidence: { customer_phrase: "Sunita didi", amount_phrase: "85 rupaye" } }), t, customers);
+  assert.equal(d.kind === "ledger" && d.state.amountPaise, 8500);
+  assert.equal(d.kind === "ledger" && d.state.notes, "3 packet Parle-G, 1 litre doodh");
+});
+test("one customer with two unmarked numbers asks for the amount instead of refusing", () => {
+  const d = decide(base({ customer_candidate_id: "s1", amount_paise: 36000, evidence: { customer_phrase: "Sunita", amount_phrase: "360" } }), "Sunita 2 Fortune tel 360", customers);
+  assert.equal(d.kind === "ask" && d.missing, "amount");
+});
+test("Marathi amount 'ekshe vees rupaye' is accepted as 120", () => {
+  const d = decide(base({ customer_candidate_id: "s1", amount_paise: 12000, language: "mr", evidence: { customer_phrase: "Sunita", amount_phrase: "ekshe vees rupaye" } }), "Sunita ne don kilo saakhar ghetli, ekshe vees rupaye baaki", customers);
+  assert.equal(d.kind === "ledger" && d.state.amountPaise, 12000);
+});

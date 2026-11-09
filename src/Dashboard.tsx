@@ -59,6 +59,7 @@ import { SetupGuide } from "./components/SetupGuide";
 import { CreateShop } from "./components/CreateShop";
 import { EntryForm } from "./components/EntryForm";
 import { Assistant } from "./components/Assistant";
+import { ParserEval } from "./components/ParserEval";
 import { displayPhone, toE164 } from "./lib/phone";
 import { db } from "./lib/firebase";
 import { collection, getDocs, limit as fsLimit, query as fsQuery } from "firebase/firestore";
@@ -237,6 +238,18 @@ export default function Dashboard() {
       setDialog(null);
     } catch (e) {
       setError(authErrorMessage(e));
+      setBusy(false);
+    }
+  }
+  async function saveLanguage(language: string) {
+    setBusy(true);
+    try {
+      await api("/api/shop", { language }, undefined, "PATCH");
+      workspace.refresh();
+      notify("Language saved. The assistant will listen for it from your next message.");
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Could not save the language.");
+    } finally {
       setBusy(false);
     }
   }
@@ -1259,6 +1272,7 @@ export default function Dashboard() {
                   integrations && integrations.uid === user?.uid ? integrations.list : null
                 }
               />
+              <ParserEval />
               <section className="panel settings-card">
                 <h2>Gnani voice-to-text</h2>
                 <p>
@@ -1330,6 +1344,21 @@ export default function Dashboard() {
                     <dd>₹ Rupees</dd>
                   </div>
                 </dl>
+                {shop && (
+                  <label className="language-setting">
+                    Language you speak in the shop
+                    <select
+                      value={shop.language || "hinglish"}
+                      disabled={busy}
+                      onChange={(e) => void saveLanguage(e.currentTarget.value)}
+                    >
+                      <option value="hinglish">Hindi / Hinglish</option>
+                      <option value="mr">मराठी Marathi (+ Hindi)</option>
+                      <option value="gu">ગુજરાતી Gujarati (+ Hindi)</option>
+                    </select>
+                    <small className="subtle">The assistant listens for this language. English words like “Surf” always work.</small>
+                  </label>
+                )}
                 {user ? (
                   <button className="button secondary" onClick={() => void logout()}>
                     <LogOut size={15} />

@@ -10,7 +10,7 @@ import type { InboundPayload } from "./whatsapp/webhook.js";
 import { gnaniSttConfig } from "./gnani-config.js";
 import { GnaniSpeechToText } from "./gnani-stt.js";
 import { ensure } from "./domain.js";
-import { msg } from "./agent/messages.js";
+import { msg, UNDO_HINT } from "./agent/messages.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -95,7 +95,7 @@ export async function runAssistantTurn(db: Firestore, uid: string, input: unknow
   const decision = checkpoint.decision;
   // WhatsApp wording ("reply to this message with GALAT") is replaced by an Undo button on the website.
   const reply = (checkpoint.replyText ?? (decision?.kind === "reply" ? decision.text : "") ?? "")
-    .replace(/\s*Galti ho to is message ko reply karke 'GALAT' likhein\.?/i, "")
+    .replace(UNDO_HINT, "")
     .trim();
   const kind: AssistantTurn["kind"] = checkpoint.entryId
     ? "saved"

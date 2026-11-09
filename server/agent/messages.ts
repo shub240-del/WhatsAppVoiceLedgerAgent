@@ -1,6 +1,7 @@
 import { formatRupees } from "../money-words.js";
 
 // Fixed, code-rendered replies. Amounts and balances always come from committed DB values.
+export const UNDO_HINT = "Galat ho to 'GALAT' likhein (10 minute ke andar).";
 export const SUPPORT = () => process.env.SUPPORT_CONTACT?.trim() || "apne shop administrator";
 export const msg = {
   unusableAudio: "Awaaz saaf nahi aayi. Aise bolein: 'Ramesh ko 500 ka udhaar likh do'.",
@@ -25,10 +26,12 @@ export const msg = {
   started: "Bot messages dobara shuru.",
   help: () =>
     `Aise bolein:\n- 'Ramesh ko 340 ka udhaar likh do'\n- 'Sunita ne 200 diye'\n- 'Ramesh ka kitna baaki hai'\nGalti ho to confirmation ko reply karke GALAT likhein (10 minute ke andar).\nMadad: ${SUPPORT()}`,
-  credit: (name: string, amount: number, balance: number) =>
-    `${name} ji ke account mein ${formatRupees(amount)} add kiye gaye. Ab total baaki ${formatRupees(balance)} hai. Galti ho to is message ko reply karke 'GALAT' likhein.`,
+  // At-a-glance format from the spec: "Ramesh: +₹340 (2kg chawal, 1 Surf). Total baaki: ₹1,260."
+  // Amount and balance always come from the committed entry, never from the model.
+  credit: (name: string, amount: number, balance: number, items = "") =>
+    `${name}: +${formatRupees(amount)}${items.trim() ? ` (${items.trim()})` : ""}. Total baaki: ${formatRupees(balance)}. ${UNDO_HINT}`,
   payment: (name: string, amount: number, balance: number) =>
-    `${name} ji se ${formatRupees(amount)} mile. Ab baaki ${formatRupees(balance)} hai. Galti ho to 'GALAT' likhein.`,
+    `${name}: ${formatRupees(amount)} mile. Total baaki: ${formatRupees(balance)}. ${UNDO_HINT}`,
   undone: (amount: number, name: string, balance: number) =>
     `${formatRupees(amount)} ka entry hata diya (reversal darj hua). ${name} ji ka baaki ab ${formatRupees(balance)} hai.`,
   advance: (amount: number, balance: number) =>

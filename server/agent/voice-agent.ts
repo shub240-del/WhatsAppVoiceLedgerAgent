@@ -12,6 +12,7 @@ import { decide, nextStep, type Decision, type FindFilters, type OpState } from 
 import { InvalidModelOutput, UnusableAudio } from "./errors.js";
 import type { EvonParser } from "./gemini.js";
 import { msg } from "./messages.js";
+import { sttLanguages } from "../languages.js";
 
 export const PENDING_TTL_MS = 15 * 60 * 1000;
 type Option = { key: number; id: string; label: string };
@@ -111,7 +112,8 @@ export class VoiceAgent {
     if (!this.deps.stt) throw new UnusableAudio("stt_not_configured");
     const media = await this.deps.whatsapp.fetchMedia(job.mediaId);
     const { durationMs } = validateAudio(media.bytes, media.mimeType);
-    const result = await this.deps.stt.transcribe(media.bytes, ["hi-IN", "en-IN"], media.mimeType);
+    const shopLanguage = (await this.shop(job).get()).get("language");
+    const result = await this.deps.stt.transcribe(media.bytes, sttLanguages(shopLanguage), media.mimeType);
     if ((result.durationMs ?? durationMs ?? 0) > MAX_AUDIO_MS) throw new UnusableAudio("too_long");
     if (result.confidence !== null && result.confidence < 0.7) throw new UnusableAudio("low_confidence");
     if (words(result.text).length < 2) throw new UnusableAudio("empty_transcript");
@@ -177,6 +179,7 @@ export class VoiceAgent {
       pendingQuestion: active?.get("questionText") ?? null,
       pendingOptions: ((active?.get("options") ?? []) as Option[]).map(({ key, label }) => ({ key, label })),
       todayIst: new Date(this.now() + 5.5 * 3600_000).toISOString().slice(0, 10),
+      shopLanguage: (await this.shop(job).get()).get("language") ?? "hinglish",
     });
     const decision = decide(proposal, transcript, customers);
     if (decision.kind === "undo_option") {
@@ -313,7 +316,7 @@ export class VoiceAgent {
             : { action: "add_payment", customerId: s.customerId, amountPaise: s.amountPaise, notes: s.notes, confirmLargeAmount: s.confirmLargeAmount, confirmAdvance: s.confirmAdvance };
           const r = (await ledger.executeWith(job.ownerUid!, action, this.key(job), context)) as { entryId: string; balancePaise: number };
           await settle(d.resolves, "completed");
-          return { text: s.action === "add_credit" ? msg.credit(name, s.amountPaise!, r.balancePaise) : msg.payment(name, s.amountPaise!, r.balancePaise), entryId: r.entryId };
+          return { text: s.action === "add_credit" ? msg.credit(name, s.amountPaise!, r.balancePaise, s.notes) : msg.payment(name, s.amountPaise!, r.balancePaise), entryId: r.entryId };
         } catch (error) {
           if (error instanceof ServiceError && (error.code === "CONFIRM_ADVANCE" || error.code === "CONFIRM_LARGE_AMOUNT")) {
             const kind: ConfirmKind = error.code === "CONFIRM_ADVANCE" ? "advance" : "large";

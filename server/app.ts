@@ -202,6 +202,10 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
     }
     if (error instanceof GnaniAccountError)
       return res.status(503).json({ error: { code: "VOICE_ACCOUNT", message: "Voice is unavailable (Gnani account problem). Nothing was saved; you can type instead." } });
+    // body-parser limits (16 kB API, 2 MB assistant audio) must not surface as a 500.
+    const status = (error as { status?: unknown; type?: unknown })?.status;
+    if (status === 413 || (error as { type?: unknown })?.type === "entity.too.large")
+      return res.status(413).json({ error: { code: "PAYLOAD_TOO_LARGE", message: "That was too large to send. For voice, keep it under 30 seconds." } });
     if (error instanceof SyntaxError) return res.status(400).json({ error: { code: "INVALID_JSON", message: "Invalid JSON request." } });
     // Never return provider responses, transcripts, credentials or stack traces.
     log("error", "request_failed", { requestId: res.locals.requestId ?? null, error: error instanceof Error ? error.name : "UnknownError" });

@@ -2,5 +2,5 @@
   "extends": "./tsconfig.json",
   "compilerOptions": { "lib": ["ES2022"], "target": "ES2022", "types": ["node"] },
   "include": ["server", "tests", "api"],
-  "exclude": ["src", "vite.config.ts", "tests/browser"]
+  "exclude": ["src", "vite.config.ts", "tests/browser", "tests/harness", "tests/components"]
 }

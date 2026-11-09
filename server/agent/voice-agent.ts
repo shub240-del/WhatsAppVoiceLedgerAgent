@@ -68,7 +68,11 @@ export class VoiceAgent {
         transcript = await this.transcript(job);
       } catch (error) {
         if (error instanceof UnusableAudio) {
-          await persist({ transcript: "", decision: { kind: "reply", text: error.reason === "too_long" ? msg.tooLong : error.reason === "stt_not_configured" ? "Voice notes abhi setup nahi hue. Kripya text mein likhein, jaise 'Ramesh ko 340 ka udhaar likh do'." : msg.unusableAudio } });
+          const sttMissing = this.web
+            ? "Bolkar entry abhi setup nahi hai. Kripya type karein, jaise 'Ramesh ko 340 ka udhaar likh do'."
+            : "Voice notes abhi setup nahi hue. Kripya text mein likhein, jaise 'Ramesh ko 340 ka udhaar likh do'.";
+          const tooLong = this.web ? "30 second se lamba tha. Chhota bolein, ek entry ek baar." : msg.tooLong;
+          await persist({ transcript: "", decision: { kind: "reply", text: error.reason === "too_long" ? tooLong : error.reason === "stt_not_configured" ? sttMissing : msg.unusableAudio } });
           return this.finish(job, cp, persist);
         }
         throw error;

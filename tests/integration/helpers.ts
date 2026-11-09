@@ -3,17 +3,27 @@ import { getFirestore, Timestamp, type Firestore } from "firebase-admin/firestor
 import type { Proposal } from "../../server/agent/schema";
 import type { EvonParser, ParserContext } from "../../server/agent/gemini";
 import type { WhatsAppGateway } from "../../server/whatsapp/client";
+import { MemoryFirestore } from "../support/memory-firestore";
 
-if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error("Integration tests require the Firestore emulator. Live project access is forbidden.");
+// MEMORY_FIRESTORE=1 runs these suites against an in-memory Firestore (tests/support) when the
+// emulator cannot be downloaded. The emulator remains the reference: CI should run both.
+const MEMORY = process.env.MEMORY_FIRESTORE === "1";
+if (!MEMORY && !process.env.FIRESTORE_EMULATOR_HOST) throw new Error("Integration tests require the Firestore emulator (or MEMORY_FIRESTORE=1). Live project access is forbidden.");
 export const PROJECT = "demo-udhaar-test";
+let memory: MemoryFirestore | null = null;
 
 export function adminApp(name: string): { app: App; db: Firestore; close: () => Promise<void> } {
+  if (MEMORY) {
+    memory = new MemoryFirestore();
+    return { app: null as unknown as App, db: memory as unknown as Firestore, close: async () => {} };
+  }
   const app = initializeApp({ projectId: PROJECT }, name);
   const db = getFirestore(app);
   return { app, db, close: async () => { await db.terminate(); await deleteApp(app); } };
 }
 
 export async function clear() {
+  if (MEMORY) return memory?.clear();
   await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, { method: "DELETE" });
 }
 

@@ -1,0 +1,130 @@
+/*
+ * Accessibility overrides, loaded last (WCAG 2.1 AA, found by an axe-core audit).
+ * 1. Text contrast ≥ 4.5:1: muted greens/olives are darkened, same hue family.
+ * 2. Readable sizes on phones: the original mobile rules shrank labels to 6–8 px.
+ * !important is deliberate: the workspace stylesheet is lazy-loaded after this file and would win ties.
+ */
+:root {
+  --a11y-muted: #4f5f45;   /* 6.6:1 on white, 6.1:1 on the light green panels */
+  --a11y-muted-2: #5a6a50; /* 5.6:1 on white */
+  --a11y-olive: #5a5631;   /* 6.6:1 on the beige reminder card */
+}
+
+.bubble-time,
+.hero-written-note > span,
+.how-number,
+.breadcrumb > span,
+.eyebrow,
+.page-heading p,
+.connection-banner span,
+.connection-banner button,
+.connection-banner strong,
+.stat-top > span:first-child,
+.stat-note,
+.empty-state p,
+.empty-state .text-button,
+.pill.light,
+.voice-copy > p,
+.voice-disclaimer,
+.speech-bubble > span,
+.transcript-card > small,
+.panel-heading p,
+.panel-footer,
+.setup-count,
+.setup-step strong,
+.setup-step small,
+.assurance span,
+.assurance strong,
+.page-footer span,
+.modal-head .eyebrow,
+.modal-description,
+.form-note,
+.subtle,
+.panel-heading .text-button,
+.table-small,
+.table-bottom span,
+.workspace-home,
+.brand small,
+.workspace-label,
+.menu-label,
+.nav-item > span,
+.trust-note p,
+.trust-note button,
+.help-link span,
+.private-label,
+.firebase-heading p,
+.pill,
+.connection-details small,
+.connection-details strong,
+.connection-foot span,
+.section-heading p,
+.settings-card p,
+.settings-card dt,
+.settings-card code,
+.policy-note h3,
+.policy-note p,
+.data-panel select,
+.table-toolbar select,
+.shop-switch small,
+.date-label,
+.help-content p {
+  color: var(--a11y-muted) !important;
+}
+.setup-step small,
+.panel-footer,
+.page-footer span,
+.speech-bubble > span,
+.transcript-card > small {
+  color: var(--a11y-muted-2) !important;
+}
+.reminder-card h3,
+.reminder-card p,
+.reminder-card .text-button,
+.pill.muted {
+  color: var(--a11y-olive) !important;
+}
+
+@media (max-width: 760px) {
+  .eyebrow,
+  .pill,
+  .voice-disclaimer,
+  .stat-note,
+  .stat-top > span:first-child,
+  .setup-step small,
+  .panel-heading p,
+  .panel-footer,
+  .assurance span,
+  .page-footer span,
+  .connection-banner span,
+  .transcript-card > small,
+  .speech-bubble > span,
+  .modal-head .eyebrow,
+  .table-small,
+  .table-bottom span,
+  .form-note,
+  .empty-state p,
+  .reminder-card p,
+  .reminder-card .text-button,
+  .voice-copy > p,
+  .breadcrumb > span,
+  .bubble-time,
+  .hero-written-note > span {
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+  }
+  .page-heading p,
+  .modal-description,
+  .setup-step strong {
+    font-size: 14px !important;
+  }
+}
+
+/* Skip link must sit inside a landmark-free spot: keep it visually hidden until focused. */
+.skip-link:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

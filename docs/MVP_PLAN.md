@@ -46,3 +46,13 @@ no accuracy test. All fixed; server layer passes 16/16 eval cases. Live score: C
 - Phase 3: Reminders without WhatsApp API: UPI link + QR, Timbre voice note, share via WhatsApp/SMS link from
   the owner's phone, list of customers without a phone number.
 - Phase 4: real-voice testing with 2 shopkeepers, fixes, 60-second demo.
+
+## Testing (run before every release; CI runs all of these on push)
+| Command | What it covers |
+|---|---|
+| `pnpm test` | 138 unit tests: amounts (Hindi/Marathi/Gujarati), quantities, parser schema, prompt examples, Gnani/Gemini error mapping, CSV safety |
+| `pnpm test:memory` | 68 integration + HTTP tests on an in-memory Firestore: voice agent, assistant, ledger, reminders, auth, tenant isolation, abuse, limits |
+| `pnpm test:components` | Real browser: assistant flows, fake-microphone recording → 16 kHz WAV, mobile, axe accessibility |
+| `pnpm test:browser` | Landing + workspace smoke tests against a running preview |
+| `pnpm test:emulators` | Same integration suites on the real Firestore/Auth emulators (needs Java + emulator download) |
+| Connections → "Run AI accuracy test" | Live Gemini score on the 16 spec cases (target ≥ 13/15) |

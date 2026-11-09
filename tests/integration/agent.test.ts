@@ -94,7 +94,7 @@ test("missing amount asks, saves pending, and resumes on reply", async () => {
   assert.equal(pending.get("status"), "awaiting_owner");
   assert.equal(pending.get("questionWamid"), wa.last().id);
   const { reply } = await send("500");
-  assert.match(reply, /₹500 add kiye/);
+  assert.match(reply, /^Sunita: \+₹500 \(aaj ka samaan\)\. Total baaki: ₹1,760\./);
   const [e] = await entries();
   assert.equal(e.signedAmountPaise, 50000);
   assert.equal(e.notes, "aaj ka samaan");
@@ -325,7 +325,7 @@ test("low-confidence transcript and over-long audio are safely rejected", async 
   assert.match(wa.last().body, /Awaaz saaf nahi aayi/);
   await ingestWebhook(db, webhookPayload(A.phone, "wamid.v4", { type: "audio", audio: { id: "M4" } }, clock), clock);
   await run();
-  assert.match(wa.last().body, /60 second se lamba/);
+  assert.match(wa.last().body, /30 second se lamba/);
   assert.equal((await entries()).length, 0);
 });
 test("stale replayed webhook (older than 24h) is ignored", async () => {

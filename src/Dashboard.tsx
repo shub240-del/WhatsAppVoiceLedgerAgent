@@ -45,6 +45,7 @@ import { beginGoogleSignIn } from "./lib/google-auth";
 import { GoogleSignInButton } from "./components/GoogleSignInButton";
 import { api } from "./lib/api";
 import { money, rupeesToPaise } from "./lib/money";
+import { toCsv } from "./lib/csv";
 import { useWorkspace, type Entry } from "./lib/useWorkspace";
 import { Modal } from "./components/Modal";
 import { CustomerDetail } from "./components/CustomerDetail";
@@ -436,8 +437,9 @@ export default function Dashboard() {
       ]),
     ];
     const blob = new Blob(
-      [rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n")],
-      { type: "text/csv" },
+      // BOM so Excel shows ₹ and Hindi names correctly; cells are formula-safe.
+      ["\ufeff" + toCsv(rows)],
+      { type: "text/csv;charset=utf-8" },
     );
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

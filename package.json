@@ -21,7 +21,10 @@
     "check:env": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local server/check-env.ts",
     "integrity:check": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local server/check-integrity.ts",
     "build:e2e": "node scripts/build-e2e.mjs",
-    "test:e2e": "playwright test -c playwright.e2e.config.ts"
+    "test:e2e": "playwright test -c playwright.e2e.config.ts",
+    "test:memory": "MEMORY_FIRESTORE=1 tsx --test --test-concurrency=1 tests/integration/agent.test.ts tests/integration/assistant.test.ts tests/integration/ledger-extended.test.ts tests/integration/reminders.test.ts tests/memory/*.test.ts",
+    "test:components": "playwright test -c playwright.components.config.ts",
+    "test:all": "pnpm typecheck && pnpm test && pnpm test:memory && pnpm build"
   },
   "dependencies": {
     "@google/genai": "^3.0.0",
@@ -37,6 +40,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4",
     "@firebase/rules-unit-testing": "^6.0.0",
     "@playwright/test": "^1.65.0",
     "@tailwindcss/vite": "^4.0.0",

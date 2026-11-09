@@ -11,8 +11,8 @@ import { Modal } from "./Modal";
 const dateFormat = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
 type Customer = { name: string; displayLabel: string; phone?: string | null; aliases?: string[]; balancePaise: number };
 
-export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse, onEdit }: {
-  shopId: string; customerId: string; close(): void; onChanged(): void; onReverse(e: Entry): void; onEdit(e: Entry): void;
+export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse, onEdit, onAdd }: {
+  shopId: string; customerId: string; close(): void; onChanged(): void; onReverse(e: Entry): void; onEdit(e: Entry): void; onAdd?(action: "add_credit" | "add_payment"): void;
 }) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [consent, setConsent] = useState("unknown");
@@ -111,6 +111,12 @@ export function CustomerDetail({ shopId, customerId, close, onChanged, onReverse
         <div><small>Phone</small><strong>{customer.phone ? displayPhone(customer.phone) : "Not added"}</strong></div>
         <div><small>Sunday reminder</small><strong>{!customer.phone ? "Skipped · no phone" : consent === "opted_in" ? "Agreed" : consent === "opted_out" ? "Said no" : "Not asked yet"}</strong></div>
       </div>
+      {onAdd && (
+        <div className="k-give-get">
+          <button type="button" className="k-btn k-btn-give" onClick={() => onAdd("add_credit")}>Udhaar diya <small>You gave</small></button>
+          <button type="button" className="k-btn k-btn-got" onClick={() => onAdd("add_payment")}>Paisa mila <small>You got</small></button>
+        </div>
+      )}
       {saved && <p className="form-success" role="status"><Check size={14} />{saved}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
 

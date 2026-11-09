@@ -1,64 +1,28 @@
 import { test, expect } from "@playwright/test";
 
-test("private workspace, navigation, login dialog and honest integration states", async ({
-  page,
-}) => {
+test("signed-out workspace asks the owner to sign in, nothing else", async ({ page }) => {
   const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/#/workspace");
-  await expect(page.getByRole("heading", { name: "Your khata, at a glance." })).toBeVisible();
-  await expect(page.getByText("A clean page. A clear start.")).toBeVisible();
-  await page.getByRole("button", { name: "Add entry", exact: true }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "Welcome to your khata." })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeVisible();
-  await expect(dialog.getByLabel("Email address")).toHaveCount(0);
-  await expect(dialog.getByLabel("Password")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(dialog).not.toBeVisible();
-  await page.getByRole("button", { name: "Explore voice commands" }).click();
-  await expect(
-    page.getByText("Say these to the assistant on your Home screen", { exact: false }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Go to the assistant", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Your khata, at a glance." })).toBeVisible();
-  await page.goto("/#/workspace/connections");
-  await expect(page.getByRole("heading", { name: "Connections and setup status." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Status not verified yet" })).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Reminders are intentionally disabled." }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Customers", exact: true }).click();
-  await expect(page.getByText("Your regulars belong here.")).toBeVisible();
-  await page.getByRole("button", { name: "Entries", exact: true }).click();
-  await expect(page.getByText("No entries yet.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Download CSV" })).toBeDisabled();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Your shop" })).toBeVisible();
-  await page.getByRole("button", { name: "Sunday reminders" }).click();
-  await expect(page.getByRole("heading", { name: "Reminders, held until approved." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to open your khata" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  await expect(page.getByText("Ramesh", { exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
-test("mobile layout and navigation have no horizontal overflow", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/#/workspace");
-  await expect(page.getByRole("heading", { name: "Your khata, at a glance." })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
-  await page.getByRole("button", { name: "Open navigation" }).click();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Your workspace settings." })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
-  await page.screenshot({ path: "/tmp/udhaar-mobile.png", fullPage: true });
+test("old workspace links still open", async ({ page }) => {
+  for (const slug of ["overview", "ledger", "connections"]) {
+    await page.goto(`/#/workspace/${slug}`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  }
 });
 
-test("desktop overview renders cleanly", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1050 });
+test("mobile workspace has a bottom bar with the mic and no overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/#/workspace");
-  await expect(page.getByRole("heading", { name: "Your khata, at a glance." })).toBeVisible();
-  await page.screenshot({ path: "/tmp/udhaar-desktop.png", fullPage: true });
+  const bar = page.getByRole("navigation", { name: "Main navigation (mobile)" });
+  await expect(bar.getByRole("button", { name: "Speak an entry" })).toBeVisible();
+  await bar.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

@@ -1,0 +1,9 @@
+/* Small shared pieces used outside the landing and workspace screens. */
+.skip-link { position: fixed; top: 12px; left: 16px; z-index: 200; padding: 10px 16px; background: #0f7a4d; color: #fff; border-radius: 6px; transform: translateY(-150%); }
+.skip-link:focus { transform: none; }
+.auth-switch { display: flex; align-items: center; justify-content: center; gap: 7px; color: #5d5d66; font-size: 13px; }
+.auth-switch button { display: flex; gap: 4px; align-items: center; color: #0f7a4d; font-weight: 600; }
+.experience-error { min-height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; flex-direction: column; gap: 20px; padding: 30px; }
+.experience-error h1 { font-size: 26px; max-width: 550px; }
+.experience-error p { color: #5d5d66; max-width: 400px; line-height: 1.7; }
+.public-loading { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); padding: 12px 18px; border: 1px solid #e6e6e9; border-radius: 9px; color: #5d5d66; background: #fff; box-shadow: 0 6px 24px rgb(0 0 0 / 0.1); z-index: 60; display: flex; align-items: center; gap: 8px; }

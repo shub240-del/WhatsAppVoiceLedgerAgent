@@ -1,95 +1,68 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { signOut } from "firebase/auth";
 import {
-  BellRing,
-  History,
-  Pencil,
-  ArrowDownLeft,
-  ArrowRight,
-  ArrowUpRight,
   AudioLines,
   BookOpen,
   Check,
-  CheckCheck,
-  ChevronDown,
   ChevronRight,
-  CircleHelp,
-  CircleUserRound,
-  Clock3,
   Download,
-  FileText,
-  Flame,
-  LayoutDashboard,
-  Link2,
+  Home,
   LoaderCircle,
-  LockKeyhole,
   LogOut,
-  Menu,
-  MessageCircle,
   Mic,
+  Pencil,
   Plus,
-  RefreshCw,
   Search,
   Settings2,
   ShieldCheck,
   Undo2,
   UsersRound,
-  Wallet,
   X,
-  ArrowLeft,
-  ListChecks,
-  Store,
 } from "lucide-react";
+import "./khata.css";
 import { auth, projectId } from "./lib/firebase";
 import { beginGoogleSignIn } from "./lib/google-auth";
 import { GoogleSignInButton } from "./components/GoogleSignInButton";
 import { api } from "./lib/api";
 import { money, rupeesToPaise } from "./lib/money";
 import { toCsv } from "./lib/csv";
-import { useWorkspace, type Entry } from "./lib/useWorkspace";
+import { useWorkspace, type Customer, type Entry } from "./lib/useWorkspace";
 import { Modal } from "./components/Modal";
 import { CustomerDetail } from "./components/CustomerDetail";
 import { EditEntry } from "./components/EditEntry";
-import {
-  ActivityPanel,
-  IntegrationsGrid,
-  RemindersPanel,
-  type Integration,
-} from "./components/ShopPanels";
+import { ActivityPanel, IntegrationsGrid, RemindersPanel, type Integration } from "./components/ShopPanels";
 import { SetupGuide } from "./components/SetupGuide";
 import { CreateShop } from "./components/CreateShop";
 import { EntryForm } from "./components/EntryForm";
 import { Assistant } from "./components/Assistant";
 import { ParserEval } from "./components/ParserEval";
 import { displayPhone, toE164 } from "./lib/phone";
-import { db } from "./lib/firebase";
-import { collection, getDocs, limit as fsLimit, query as fsQuery } from "firebase/firestore";
 import { authErrorMessage } from "./lib/auth-errors";
 
-type Tab =
-  | "Overview"
-  | "Customers"
-  | "Ledger"
-  | "Activity"
-  | "Reminders"
-  | "Connections"
-  | "Settings";
-type Dialog = "login" | "customer" | "entry" | "help" | "voice" | null;
-const nav = [
-  { name: "Overview" as const, icon: LayoutDashboard },
-  { name: "Customers" as const, icon: UsersRound },
-  { name: "Ledger" as const, icon: BookOpen },
-  { name: "Activity" as const, icon: History },
+type Tab = "home" | "customers" | "entries" | "settings" | "advanced";
+type Action = "add_credit" | "add_payment";
+type Dialog = "login" | "customer" | "entry" | "help" | null;
+
+const NAV = [
+  { id: "home" as const, label: "Home", icon: Home },
+  { id: "customers" as const, label: "Customers", icon: UsersRound },
+  { id: "entries" as const, label: "Entries", icon: BookOpen },
+  { id: "settings" as const, label: "Settings", icon: Settings2 },
 ];
-// Plain words for the shop owner; internal tab names stay stable for URLs.
-const TAB_LABELS: Record<Tab, string> = {
-  Overview: "Home",
-  Customers: "Customers",
-  Ledger: "Entries",
-  Activity: "Activity",
-  Reminders: "Reminders",
-  Connections: "Connections",
-  Settings: "Settings",
+const TITLES: Record<Tab, string> = {
+  home: "Home",
+  customers: "Customers",
+  entries: "Entries",
+  settings: "Settings",
+  advanced: "Setup & status",
+};
+// Old links (#/workspace/overview, /ledger, /connections…) keep working.
+const LEGACY: Record<string, Tab> = {
+  overview: "home",
+  ledger: "entries",
+  connections: "advanced",
+  activity: "advanced",
+  reminders: "advanced",
 };
 const dateFormat = new Intl.DateTimeFormat("en-IN", {
   day: "numeric",
@@ -99,130 +72,92 @@ const dateFormat = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",
 });
 function tabFromHash(): Tab {
-  const slug = window.location.hash.split("/")[2]?.split("?")[0]?.toLowerCase();
-  return (
-    ([...nav.map((item) => item.name), "Reminders", "Connections", "Settings"].find(
-      (name) => name.toLowerCase() === slug,
-    ) as Tab) || "Overview"
-  );
+  const slug = window.location.hash.split("/")[2]?.split("?")[0]?.toLowerCase() ?? "";
+  if (slug in TITLES) return slug as Tab;
+  return LEGACY[slug] ?? "home";
 }
+const initial = (name: string) => (name.trim()[0] || "?").toUpperCase();
+const when = (e: Entry) => (e.createdAt ? dateFormat.format(e.createdAt.toDate()) : "—");
 
-export default function Dashboard() {
-  const workspace = useWorkspace();
+/** `useData` is swappable only so tests can render the real screens with fake shop data. */
+export default function Dashboard({ useData = useWorkspace }: { useData?: typeof useWorkspace } = {}) {
+  const workspace = useData();
   const { user, shop, customers, entries, totals, reversals, loading } = workspace;
   const [tab, setTab] = useState<Tab>(tabFromHash);
   const [dialog, setDialog] = useState<Dialog>(null);
-  const [mobileNav, setMobileNav] = useState(false);
-  const [compactNav, setCompactNav] = useState(
-    () => window.matchMedia("(max-width: 760px)").matches,
-  );
-  const navigationRef = useRef<HTMLElement>(null);
+  const [entryAction, setEntryAction] = useState<Action>("add_credit");
+  const [selectedCustomer, setSelectedCustomer] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [reversing, setReversing] = useState<Entry | null>(null);
-  const [selectedCustomer, setSelectedCustomer] = useState("");
-  const [connection, setConnection] = useState<"idle" | "checking" | "ok" | "error">("idle");
-  const [connectionMessage, setConnectionMessage] = useState("");
-  const [integrations, setIntegrations] = useState<{ uid: string; list: Integration[] } | null>(
-    null,
-  );
+  const [reason, setReason] = useState("");
   const [detailCustomer, setDetailCustomer] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [setup, setSetup] = useState(window.location.hash.includes("setup=1"));
-  const operation = useRef<{ payload: string; key: string } | null>(null);
   const [newName, setNewName] = useState("");
-  const [reason, setReason] = useState("");
+  const [connection, setConnection] = useState<"idle" | "checking" | "ok" | "error">("idle");
+  const [connectionMessage, setConnectionMessage] = useState("");
+  const [integrations, setIntegrations] = useState<{ uid: string; list: Integration[] } | null>(null);
+  const [gnaniCheck, setGnaniCheck] = useState<"checking" | { ok: boolean; detail: string } | null>(null);
+  const operation = useRef<{ payload: string; key: string } | null>(null);
   const duplicateOf = newName.trim()
     ? customers.filter((c) => c.name.trim().toLowerCase() === newName.trim().toLowerCase())
     : [];
-  const [consents, setConsents] = useState<Record<string, string>>({});
-  const now = new Date();
-  useEffect(() => {
-    if (tab !== "Customers" || !shop) return;
-    let active = true;
-    getDocs(fsQuery(collection(db, "shops", shop.id, "reminderPreferences"), fsLimit(1000)))
-      .then((snap) => {
-        if (!active) return;
-        const map: Record<string, string> = {};
-        snap.forEach((d) => (map[d.id] = String(d.get("status") ?? "unknown")));
-        setConsents(map);
-      })
-      .catch(() => active && setConsents({}));
-    return () => {
-      active = false;
-    };
-  }, [tab, shop, customers]);
+
   useEffect(() => {
     if (!user) return;
     setDialog(null);
     setBusy(false);
     setError("");
-  }, [user]);
+  }, [user?.uid]);
   useEffect(() => {
-    const syncTab = () => {
+    const sync = () => {
       setTab(tabFromHash());
       setSearch("");
       setFilter("all");
-      setMobileNav(false);
     };
-    window.addEventListener("hashchange", syncTab);
-    return () => window.removeEventListener("hashchange", syncTab);
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
   }, []);
   useEffect(() => {
-    document.title = `${TAB_LABELS[tab]} · Udhaar`;
+    document.title = `${TITLES[tab]} · Udhaar`;
   }, [tab]);
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 760px)");
-    const update = () => {
-      setCompactNav(query.matches);
-      if (!query.matches) setMobileNav(false);
-    };
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  useEffect(() => {
-    if (!mobileNav) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileNav(false);
-    };
-    window.addEventListener("keydown", escape);
-    navigationRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    return () => {
-      document.body.style.overflow = previous;
-      window.removeEventListener("keydown", escape);
-    };
-  }, [mobileNav]);
-
-  useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 6500);
+    const timer = setTimeout(() => setToast(""), 6000);
     return () => clearTimeout(timer);
   }, [toast]);
+
   function navigate(next: Tab) {
     setTab(next);
     setSearch("");
     setFilter("all");
-    setMobileNav(false);
-    window.location.hash = `/workspace/${next.toLowerCase()}`;
+    window.location.hash = `/workspace/${next}`;
     window.scrollTo(0, 0);
   }
   function open(next: Dialog) {
     setError("");
     setNewName("");
     operation.current = null;
-    setDialog(next);
+    setDialog(user || next === "help" ? next : "login");
   }
-  function notify(message: string) {
-    setToast(message);
+  function openEntry(action: Action, customerId = "") {
+    setEntryAction(action);
+    setSelectedCustomer(customerId);
+    setDetailCustomer(null);
+    open("entry");
   }
-  function requireOwner(next: Dialog) {
-    if (next === "entry") setSelectedCustomer("");
-    open(user ? next : "login");
+  function speak() {
+    // Voice-first: the mic button always lands on the assistant, ready to listen.
+    if (tab !== "home") navigate("home");
+    requestAnimationFrame(() => {
+      const panel = document.getElementById("assistant");
+      panel?.scrollIntoView({ behavior: "smooth", block: "center" });
+      panel?.querySelector<HTMLButtonElement>("button[aria-label*='ecord'], button[aria-label*='ic']")?.focus();
+    });
   }
   function keyFor(payload: unknown) {
     const serialized = JSON.stringify(payload);
@@ -230,15 +165,18 @@ export default function Dashboard() {
       operation.current = { payload: serialized, key: crypto.randomUUID() };
     return operation.current.key;
   }
+  const customerName = (id: string) =>
+    customers.find((c) => c.id === id)?.name || `Customer ${id.slice(0, 8)}`;
+
   async function submitLogin() {
     setBusy(true);
     setError("");
     try {
       await beginGoogleSignIn();
-      setBusy(false);
       setDialog(null);
     } catch (e) {
       setError(authErrorMessage(e));
+    } finally {
       setBusy(false);
     }
   }
@@ -247,9 +185,9 @@ export default function Dashboard() {
     try {
       await api("/api/shop", { language }, undefined, "PATCH");
       workspace.refresh();
-      notify("Language saved. The assistant will listen for it from your next message.");
+      setToast("Language saved. The assistant listens for it from your next message.");
     } catch (e) {
-      notify(e instanceof Error ? e.message : "Could not save the language.");
+      setToast(e instanceof Error ? e.message : "Could not save the language.");
     } finally {
       setBusy(false);
     }
@@ -292,23 +230,11 @@ export default function Dashboard() {
       operation.current = null;
       setDialog(null);
       workspace.refresh();
-      notify(`${payload.name} added.`);
+      setToast(`${payload.name} added.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Customer could not be created.");
     } finally {
       setBusy(false);
-    }
-  }
-  async function logout() {
-    try {
-      await signOut(auth);
-      setDetailCustomer(null);
-      setEditingEntry(null);
-      setReversing(null);
-      setSetup(false);
-      notify("Signed out securely.");
-    } catch (e) {
-      notify(authErrorMessage(e));
     }
   }
   async function submitEntry(e: FormEvent<HTMLFormElement>) {
@@ -326,15 +252,11 @@ export default function Dashboard() {
         confirmLargeAmount: data.get("large") === "on",
         ...(action === "add_payment" ? { confirmAdvance: data.get("advance") === "on" } : {}),
       };
-      const result = await api<{ balancePaise: number }>(
-        "/api/ledger/actions",
-        payload,
-        keyFor(payload),
-      );
+      const result = await api<{ balancePaise: number }>("/api/ledger/actions", payload, keyFor(payload));
       operation.current = null;
       setDialog(null);
       workspace.refresh();
-      notify(`Saved. ${customerName(payload.customerId)} now owes ${money(result.balancePaise)}.`);
+      setToast(`Saved. ${customerName(payload.customerId)} now owes ${money(result.balancePaise)}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Nothing was saved. Try again.");
     } finally {
@@ -346,39 +268,46 @@ export default function Dashboard() {
     if (!reversing) return;
     setBusy(true);
     setError("");
-    const reason = String(new FormData(e.currentTarget).get("reason")).trim();
-    if (reason.length < 3) {
+    const why = String(new FormData(e.currentTarget).get("reason")).trim();
+    if (why.length < 3) {
       setBusy(false);
       setError("Tap a reason, or type one.");
       return;
     }
-    const payload = {
-      action: "undo_entry",
-      entryId: reversing.id,
-      reason,
-    };
+    const payload = { action: "undo_entry", entryId: reversing.id, reason: why };
     try {
-      const result = await api<{ balancePaise: number }>(
-        "/api/ledger/actions",
-        payload,
-        keyFor(payload),
-      );
+      const result = await api<{ balancePaise: number }>("/api/ledger/actions", payload, keyFor(payload));
       operation.current = null;
       setReversing(null);
       workspace.refresh();
-      notify(`Entry cancelled. ${customerName(reversing.customerId)} now owes ${money(result.balancePaise)}.`);
+      setToast(`Entry cancelled. ${customerName(reversing.customerId)} now owes ${money(result.balancePaise)}.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Reversal failed.");
     } finally {
       setBusy(false);
     }
   }
-  const [gnaniCheck, setGnaniCheck] = useState<"checking" | { ok: boolean; detail: string } | null>(null);
-  async function testGnani() {
-    if (!user) {
-      open("login");
-      return;
+  function startReversal(e: Entry) {
+    setDetailCustomer(null);
+    setError("");
+    setReason("");
+    operation.current = null;
+    setReversing(e);
+  }
+  async function logout() {
+    try {
+      await signOut(auth);
+      setDetailCustomer(null);
+      setEditingEntry(null);
+      setReversing(null);
+      setSetup(false);
+      setToast("Signed out.");
+    } catch (e) {
+      setToast(authErrorMessage(e));
     }
+  }
+  async function testGnani() {
+    if (!user) return open("login");
     setGnaniCheck("checking");
     try {
       setGnaniCheck(await api<{ ok: boolean; detail: string }>("/api/integrations/gnani/verify", {}));
@@ -387,47 +316,35 @@ export default function Dashboard() {
     }
   }
   async function checkConnection() {
-    if (!user) {
-      open("login");
-      return;
-    }
+    if (!user) return open("login");
     setConnection("checking");
     setConnectionMessage("");
     try {
       const result = await api<{ integrations: Integration[] }>("/api/connection");
       setIntegrations({ uid: user.uid, list: result.integrations });
       setConnection("ok");
-      setConnectionMessage("Authenticated API and Firestore owner membership verified.");
+      setConnectionMessage("Signed-in API and shop access verified.");
     } catch (e) {
       setIntegrations(null);
       setConnection("error");
       setConnectionMessage(e instanceof Error ? e.message : "Connection check failed.");
     }
   }
-  const customerName = (id: string) =>
-    customers.find((c) => c.id === id)?.name || `Customer ${id.slice(0, 8)}`;
+
   const filteredCustomers = customers
-    .filter((c) =>
-      `${c.name} ${c.displayLabel} ${c.phone || ""}`.toLowerCase().includes(search.toLowerCase()),
-    )
-    .filter((c) => filter !== "outstanding" || c.balancePaise > 0)
-    .sort((a, b) =>
-      filter === "highest" ? b.balancePaise - a.balancePaise : a.name.localeCompare(b.name),
-    );
+    .filter((c) => `${c.name} ${c.displayLabel} ${c.phone || ""}`.toLowerCase().includes(search.toLowerCase()))
+    .filter((c) => filter !== "due" || c.balancePaise > 0)
+    .sort((a, b) => (filter === "highest" ? b.balancePaise - a.balancePaise : a.name.localeCompare(b.name)));
   const filteredEntries = entries
-    .filter(
-      (e) => filter === "all" || (filter === "reversed" ? reversals.has(e.id) : e.type === filter),
-    )
+    .filter((e) => filter === "all" || (filter === "reversed" ? reversals.has(e.id) : e.type === filter))
     .filter((e) =>
-      `${customerName(e.customerId)} ${e.notes || ""} ${e.id}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+      `${customerName(e.customerId)} ${e.notes || ""} ${e.id}`.toLowerCase().includes(search.toLowerCase()),
     );
   function exportLedger() {
     const rows = [
       ["Date (IST)", "Customer", "Type", "Amount (₹)", "Status", "Note", "Entry ID"],
       ...filteredEntries.map((e) => [
-        e.createdAt ? dateFormat.format(e.createdAt.toDate()) : "",
+        when(e),
         customerName(e.customerId),
         e.type === "credit" ? "Udhaar" : e.type === "payment" ? "Payment" : "Correction",
         (e.signedAmountPaise / 100).toFixed(2),
@@ -436,22 +353,22 @@ export default function Dashboard() {
         e.id,
       ]),
     ];
-    const blob = new Blob(
-      // BOM so Excel shows ₹ and Hindi names correctly; cells are formula-safe.
-      ["\ufeff" + toCsv(rows)],
-      { type: "text/csv;charset=utf-8" },
-    );
+    // BOM so Excel shows ₹ and Hindi names correctly; cells are formula-safe.
+    const blob = new Blob(["﻿" + toCsv(rows)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = "udhaar-entries.csv";
     link.click();
     URL.revokeObjectURL(url);
-    notify(`Downloaded ${filteredEntries.length} entries.`);
+    setToast(`Downloaded ${filteredEntries.length} entries.`);
   }
-  const recent = entries.slice(0, 5);
+
+  const ready = Boolean(user && shop && !workspace.needsShop);
+  const due = customers.filter((c) => c.balancePaise > 0).length;
+
   return (
-    <div className="app-shell">
+    <div className="k-app">
       <a
         href="#/workspace"
         className="skip-link"
@@ -460,897 +377,220 @@ export default function Dashboard() {
           document.getElementById("workspace-content")?.focus();
         }}
       >
-        Skip to workspace
+        Skip to content
       </a>
-      {mobileNav && (
-        <button
-          aria-label="Close navigation"
-          className="nav-backdrop"
-          onClick={() => setMobileNav(false)}
-        />
-      )}
-      <aside
-        ref={navigationRef}
-        className={`sidebar ${mobileNav ? "mobile-open" : ""}`}
-        inert={compactNav && !mobileNav}
-        aria-label="Workspace navigation"
-      >
-        <a href="#" className="workspace-home">
-          <ArrowLeft size={12} />
-          Back to Udhaar
-        </a>
-        <a
-          href="#"
-          className="brand"
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("Overview");
-          }}
-        >
-          <span className="brand-mark">
-            <AudioLines size={23} strokeWidth={2.3} />
+      <aside className="k-side" aria-label="Sidebar">
+        <a className="k-brand" href="./" aria-label="Udhaar home">
+          <span className="k-logo">
+            <AudioLines size={16} />
           </span>
           <span>
-            udhaar<span className="brand-dot">.</span>
-            <small>YOUR VOICE. YOUR KHATA.</small>
+            <strong>{shop?.name || "Udhaar"}</strong>
+            <small>Voice khata</small>
           </span>
         </a>
-        <div className="workspace-label">WORKSPACE</div>
-        <button
-          className="shop-switch"
-          onClick={() => (user ? navigate("Settings") : open("login"))}
-        >
-          <span className="shop-icon">
-            <Wallet size={18} />
-          </span>
-          <span>
-            {shop?.name || "Your shop"}
-            <small>{shop ? "Owner workspace" : "Sign in to your workspace"}</small>
-          </span>
-          <ChevronDown size={15} />
-        </button>
-        <div className="workspace-label menu-label">MANAGE</div>
-        <nav aria-label="Main navigation">
-          {nav.map((item) => (
+        <nav className="k-nav" aria-label="Main navigation">
+          {NAV.map((item) => (
             <button
-              key={item.name}
-              className={`nav-item ${tab === item.name ? "active" : ""}`}
-              aria-current={tab === item.name ? "page" : undefined}
-              onClick={() => navigate(item.name)}
+              key={item.id}
+              className={tab === item.id || (item.id === "settings" && tab === "advanced") ? "active" : ""}
+              aria-current={tab === item.id ? "page" : undefined}
+              onClick={() => navigate(item.id)}
             >
-              <item.icon size={18} />
-              <span>{TAB_LABELS[item.name]}</span>
-              {tab === item.name && <span className="nav-active-dot" />}
+              <item.icon size={16} />
+              {item.label}
             </button>
           ))}
-          <div className="nav-divider" />
-          <button
-            className={`nav-item ${["Settings", "Reminders", "Connections"].includes(tab) ? "active" : ""}`}
-            aria-current={tab === "Settings" ? "page" : undefined}
-            onClick={() => navigate("Settings")}
-          >
-            <Settings2 size={18} />
-            <span>Settings</span>
-          </button>
         </nav>
-        <div className="sidebar-bottom">
-          <div className="trust-note">
-            <span className="trust-icon">
-              <ShieldCheck size={19} />
-            </span>
-            <strong>Your khata, protected.</strong>
-            <p>
-              Every entry has a history.
-              <br />
-              Every change is traceable.
-            </p>
-            <button onClick={() => open("help")}>
-              How it works <ArrowUpRight size={13} />
-            </button>
-          </div>
-          <button className="nav-item help-link" onClick={() => open("help")}>
-            <CircleHelp size={18} />
-            <span>Help & support</span>
-            <ArrowUpRight size={14} />
-          </button>
-          <div className="profile">
-            <div className="avatar">
-              {user?.email?.slice(0, 1).toUpperCase() || <CircleUserRound size={22} />}
-            </div>
-            <span>
-              {user?.email?.split("@")[0] || "Shop owner"}
-              <small>{user ? "Owner account" : "Not signed in"}</small>
-            </span>
-            <button
-              className="icon-btn"
-              aria-label={user ? "Sign out" : "Sign in"}
-              onClick={() => (user ? void logout() : open("login"))}
-            >
-              {user ? <LogOut size={17} /> : <ArrowRight size={17} />}
-            </button>
-          </div>
+        <button className="k-speak" onClick={speak}>
+          <Mic size={16} />
+          Speak an entry
+        </button>
+        <div className="k-side-foot">
+          {user ? <span title={user.email ?? ""}>{user.email}</span> : <button onClick={() => open("login")}>Sign in</button>}
         </div>
       </aside>
 
-      <main className="main" id="workspace-content" tabIndex={-1} inert={compactNav && mobileNav}>
-        <header className="topbar">
-          <div className="breadcrumb">
-            <button
-              className="icon-btn mobile-menu"
-              aria-label="Open navigation"
-              aria-expanded={mobileNav}
-              onClick={() => setMobileNav(true)}
-            >
-              <Menu size={21} />
+      <main className="k-main" id="workspace-content" tabIndex={-1}>
+        <header className="k-head">
+          <h1>{TITLES[tab]}</h1>
+          {tab === "customers" && ready && (
+            <button className="k-btn k-btn-primary" onClick={() => open("customer")}>
+              <Plus size={15} />
+              Add customer
             </button>
-            <span>{shop?.name || "Udhaar"}</span>
-            <ChevronRight size={13} />
-            <strong>{TAB_LABELS[tab]}</strong>
-          </div>
-          <div className="topbar-right">
-            {user && (
-              <button
-                className="icon-btn"
-                aria-label="Open setup guide"
-                title="Shop setup guide"
-                onClick={() => setSetup(true)}
-              >
-                <ListChecks size={19} />
-              </button>
-            )}
-            <span className="private-label">
-              <LockKeyhole size={13} /> Private workspace
-            </span>
-            <span className="topbar-divider" />
-            <button className="icon-btn" aria-label="Help" onClick={() => open("help")}>
-              <CircleHelp size={18} />
+          )}
+          {tab === "entries" && ready && (
+            <button className="k-btn" disabled={!filteredEntries.length} onClick={exportLedger}>
+              <Download size={15} />
+              Download CSV
             </button>
-            <button
-              className="mini-avatar"
-              aria-label="Owner account"
-              onClick={() => (user ? navigate("Settings") : open("login"))}
-            >
-              {user?.email?.[0].toUpperCase() || "S"}
-            </button>
-          </div>
+          )}
         </header>
-        <div className="page-content">
-          <div className="page-heading">
-            <div>
-              <div className="eyebrow">
-                {tab === "Overview" ? "A LITTLE CLARITY, EVERY DAY" : "YOUR SHOP, ALL IN ONE PLACE"}
-              </div>
-              <h1>
-                {tab === "Overview"
-                  ? "Your khata, at a glance."
-                  : tab === "Connections"
-                    ? "Connections and setup status."
-                    : tab === "Settings"
-                      ? "Your workspace settings."
-                      : tab === "Customers"
-                        ? "Who owes you, and how much."
-                        : tab === "Activity"
-                          ? "Every change, on the record."
-                          : tab === "Reminders"
-                            ? "Reminders, held until approved."
-                            : "Every entry, in one place."}
-              </h1>
-              <p>
-                {tab === "Overview"
-                  ? "Less time keeping accounts. More time running your shop."
-                  : tab === "Connections"
-                    ? "For whoever set up Udhaar: which services are switched on."
-                    : tab === "Settings"
-                      ? "Your shop and account."
-                      : tab === "Customers"
-                        ? "Tap a name to see their full history."
-                        : tab === "Activity"
-                          ? "Questions waiting for your answer, and every change made."
-                          : tab === "Reminders"
-                            ? "Who has agreed to Sunday reminders, and who is skipped."
-                            : "Every udhaar and payment. Mistakes are fixed, never erased."}
-              </p>
-            </div>
-            <div className="heading-actions">
-              {tab === "Overview" && (
-                <span className="date-label">
-                  <Clock3 size={14} />
-                  {now.toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                    timeZone: "Asia/Kolkata",
-                  })}
-                </span>
-              )}
-              {(tab === "Overview" || tab === "Ledger") && (
-                <button className="button primary" onClick={() => requireOwner("entry")}>
-                  <Plus size={17} />
-                  Add entry
-                </button>
-              )}
-              {tab === "Customers" && (
-                <button className="button primary" onClick={() => requireOwner("customer")}>
-                  <Plus size={17} />
-                  Add customer
-                </button>
-              )}
-            </div>
-          </div>
 
-          {!user && (
-            <div className="connection-banner">
-              <div className="banner-icon">
-                <Flame size={19} />
-              </div>
-              <div>
-                <strong>A fresh start for your shop.</strong>
-                <span>Sign in with Google to open your shop’s khata.</span>
-              </div>
-              <button onClick={() => open("login")}>
-                Sign in as owner <ArrowRight size={15} />
-              </button>
-            </div>
-          )}
-          {workspace.error && (
-            <div className="error-banner" role="alert">
-              {workspace.error}
-              <button onClick={workspace.refresh}>Retry</button>
-              
-            </div>
-          )}
-          {user && !shop && !loading && !workspace.error && !workspace.needsShop && (
-            <div className="page-loading" role="status">
-              <LoaderCircle size={16} className="spin" />
-              Verifying your shop access…
-            </div>
-          )}
-          {workspace.needsShop && (
+        {workspace.error && (
+          <div className="k-alert" role="alert">
+            {workspace.error}
+            <button className="k-link" onClick={workspace.refresh}>Retry</button>
+          </div>
+        )}
+
+        {!workspace.authReady || (user && !shop && !workspace.needsShop && !workspace.error) ? (
+          <Loading />
+        ) : !user ? (
+          <section className="k-card k-center">
+            <span className="k-logo big">
+              <AudioLines size={22} />
+            </span>
+            <h2>Sign in to open your khata</h2>
+            <p className="k-muted">Only you can see your shop’s records.</p>
+            <GoogleSignInButton busy={busy} onClick={() => void submitLogin()} />
+            {error && <p className="form-error" role="alert">{error}</p>}
+          </section>
+        ) : workspace.needsShop ? (
+          <section className="k-card">
             <CreateShop
               onCreated={() => {
                 workspace.refresh();
-                notify("Your khata is ready. Add your first customer.");
+                setToast("Your khata is ready. Add your first customer.");
               }}
             />
-          )}
-          {!workspace.needsShop && (
-            <>
-          {tab === "Overview" && user && shop && totals.customers === 0 && !loading && (
-            <section className="onboarding-banner">
-              <div>
-                <span>
-                  <Store size={20} />
-                </span>
-                <div>
-                  <strong>Your shop is linked. Let’s make it your khata.</strong>
-                  <p>
-                    Add your first customer, then record an udhaar or a payment.
-                  </p>
-                </div>
-              </div>
-              <button className="button primary small" onClick={() => open("customer")}>
-                Add first customer
-                <Plus size={14} />
-              </button>
-            </section>
-          )}
-
-          {tab === "Overview" && (
-            <>
-              <div className="stats-grid">
-                <Stat
-                  label="Total udhaar baaki"
-                  value={shop ? money(totals.balance) : "₹ —"}
-                  icon={<Wallet size={19} />}
-                  note="Money customers owe you"
-                  color="green"
-                />
-                <Stat
-                  label="Customers who owe you"
-                  value={shop ? String(customers.filter((c) => c.balancePaise > 0).length) : "—"}
-                  icon={<UsersRound size={19} />}
-                  note={shop ? `Out of ${totals.customers} customers` : "Sign in to see"}
-                  color="blue"
-                />
-                <Stat
-                  label="Entries"
-                  value={shop ? String(totals.entries) : "—"}
-                  icon={<BookOpen size={19} />}
-                  note="Udhaar, payments and fixes"
-                  color="orange"
-                />
-              </div>
-              <div className="overview-columns">
-                <div className="overview-left">
-                  {user && shop ? (
-                    <Assistant onChanged={workspace.refresh} />
-                  ) : (
-                  <section className="voice-card">
-                    <div className="voice-copy">
-                      <span className="pill light">
-                        <span className="tiny-dot" />
-                        VOICE-FIRST. HASSLE-FREE.
-                      </span>
-                      <h2>
-                        Bas bolo.
-                        <br />
-                        Hisaab ho gaya.
-                      </h2>
-                      <p>
-                        A voice note is all it takes to keep
-                        <br className="desktop-break" /> your udhaar in order.
-                      </p>
-                      <button className="button dark" onClick={() => open("voice")}>
-                        <MessageCircle size={16} />
-                        Explore voice commands
-                        <ArrowUpRight size={15} />
-                      </button>
-                      <span className="voice-disclaimer">
-                        <LockKeyhole size={11} />
-                        Sign in to start speaking your entries
-                      </span>
-                    </div>
-                    <div className="voice-visual">
-                      <div className="voice-orbit orbit-one" />
-                      <div className="voice-orbit orbit-two" />
-                      <div className="microphone">
-                        <Mic size={36} strokeWidth={1.6} />
-                      </div>
-                      <div className="speech-bubble">
-                        <div className="voice-wave">
-                          {[10, 20, 14, 28, 36, 23, 17, 30, 20, 12, 25, 16, 9].map((h, i) => (
-                            <i key={i} style={{ height: h }} />
-                          ))}
-                        </div>
-                        <span>0:08</span>
-                        <CheckCheck size={13} />
-                      </div>
-                      <div className="transcript-card">
-                        <span>
-                          “Ramesh ko 340 rupaye
-                          <br />
-                          ka udhaar likh do.”
-                        </span>
-                        <small>
-                          Example voice command <AudioLines size={12} />
-                        </small>
-                      </div>
-                    </div>
-                  </section>
-                  )}
-                  <section className="panel recent-panel">
-                    <div className="panel-heading">
-                      <div>
-                        <h2>
-                          Recent activity <span className="section-dot" />
-                        </h2>
-                        <p>Your latest entries, with the full picture.</p>
-                      </div>
-                      <button className="text-button" onClick={() => navigate("Ledger")}>
-                        See all entries <ArrowRight size={14} />
-                      </button>
-                    </div>
-                    {loading ? (
-                      <Loading />
-                    ) : recent.length ? (
-                      <div className="activity-list">
-                        {recent.map((e) => (
-                          <div className="activity-row" key={e.id}>
-                            <span className={`activity-icon ${e.type}`}>
-                              {e.type === "payment" ? (
-                                <ArrowDownLeft size={18} />
-                              ) : e.type === "reversal" ? (
-                                <Undo2 size={17} />
-                              ) : (
-                                <ArrowUpRight size={18} />
-                              )}
-                            </span>
-                            <div>
-                              <strong>{customerName(e.customerId)}</strong>
-                              <small>
-                                {e.type === "credit"
-                                  ? "Udhaar given"
-                                  : e.type === "payment"
-                                    ? "Payment received"
-                                    : "Correction"}{" "}
-                                ·{" "}
-                                {e.createdAt
-                                  ? dateFormat.format(e.createdAt.toDate())
-                                  : "Pending timestamp"}
-                              </small>
-                            </div>
-                            <span
-                              className={`activity-amount ${reversals.has(e.id) ? "reversed-text" : ""}`}
-                            >
-                              {e.signedAmountPaise > 0 ? "+" : "−"}
-                              {money(Math.abs(e.signedAmountPaise))}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <Empty
-                        icon={<BookOpen size={23} />}
-                        title="A clean page. A clear start."
-                        description={
-                          user
-                            ? "Your first udhaar or payment will show up here."
-                            : "Sign in to see your shop’s activity. Your records stay private."
-                        }
-                        action={user ? "Add your first entry" : "Open your khata"}
-                        onClick={() => requireOwner("entry")}
-                      />
-                    )}
-                    <div className="panel-footer">
-                      <ShieldCheck size={13} />
-                      Mistakes are fixed with a new entry. Nothing is ever erased.
-                    </div>
-                  </section>
-                </div>
-                <div className="overview-right">
-                  <section className="panel setup-panel">
-                    <div className="panel-heading">
-                      <div>
-                        <h2>Make it your khata</h2>
-                        <p>A few small steps. A simpler day.</p>
-                      </div>
-                      <span className="setup-count">
-                        {(user ? 1 : 0) + (shop ? 1 : 0) + (totals.customers > 0 ? 1 : 0) + (totals.entries > 0 ? 1 : 0)}/4
-                      </span>
-                    </div>
-                    <div className="progress-track">
-                      <div
-                        style={{
-                          width: `${((user ? 1 : 0) + (shop ? 1 : 0) + (totals.customers > 0 ? 1 : 0) + (totals.entries > 0 ? 1 : 0)) * 25}%`,
-                        }}
-                      />
-                    </div>
-                    <SetupStep
-                      done={Boolean(user)}
-                      title="Sign in with Google"
-                      detail="Only you can open your shop"
-                      onClick={() => open("login")}
-                    />
-                    <SetupStep
-                      done={Boolean(shop)}
-                      title="Name your shop"
-                      detail="Takes 10 seconds"
-                      onClick={() => (user ? navigate("Overview") : open("login"))}
-                    />
-                    <SetupStep
-                      done={totals.customers > 0}
-                      title="Add your first customer"
-                      detail="A name, a landmark, a familiar face"
-                      onClick={() => requireOwner("customer")}
-                    />
-                    <SetupStep
-                      done={totals.entries > 0}
-                      title="Record your first udhaar"
-                      detail="Who took what, and how much"
-                      onClick={() => requireOwner("entry")}
-                    />
-                  </section>
-                  <section className="reminder-card">
-                    <div className="reminder-top">
-                      <span className="reminder-icon">
-                        <Clock3 size={19} />
-                      </span>
-                      <span className="pill muted">OFF BY DEFAULT</span>
-                    </div>
-                    <h3>
-                      A thoughtful pause{" "}
-                      <br />
-                      on reminders.
-                    </h3>
-                    <p>
-                      Customer reminders are off for now. Your khata works without them.
-                    </p>
-                    <button className="text-button" onClick={() => navigate("Reminders")}>
-                      See reminder status <ArrowRight size={14} />
-                    </button>
-                  </section>
-                  <div className="assurance">
-                    <ShieldCheck size={17} />
-                    <span>
-                      Built for trust.
-                      <br />
-                      <strong>One shop. One private khata.</strong>
+          </section>
+        ) : (
+          <>
+            {tab === "home" && (
+              <div className="k-stack">
+                <section className="k-balance" aria-label="Total balance">
+                  <div>
+                    <small>You’ll get</small>
+                    <strong className={totals.balance > 0 ? "k-due" : totals.balance < 0 ? "k-adv" : ""}>
+                      {money(Math.max(totals.balance, 0))}
+                    </strong>
+                    <span className="k-muted">
+                      {totals.customers ? `${due} of ${totals.customers} customers owe you` : "No customers yet"}
                     </span>
                   </div>
-                </div>
-              </div>
-            </>
-          )}
+                  <div className="k-give-get">
+                    <button className="k-btn k-btn-give" onClick={() => openEntry("add_credit")}>
+                      Udhaar diya <small>You gave</small>
+                    </button>
+                    <button className="k-btn k-btn-got" onClick={() => openEntry("add_payment")}>
+                      Paisa mila <small>You got</small>
+                    </button>
+                  </div>
+                </section>
 
-          {tab === "Customers" && (
-            <section className="panel data-panel">
-              <div className="table-toolbar">
-                <div className="search-field">
-                  <Search size={16} />
-                  <input
-                    aria-label="Search customers"
-                    placeholder="Search by name, landmark or phone…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
+                <div id="assistant" className="k-assistant">
+                  <Assistant onChanged={workspace.refresh} disabled={!ready} />
                 </div>
-                <select
-                  aria-label="Customer filter and sort"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                >
-                  <option value="all">Name: A to Z</option>
-                  <option value="highest">Owes the most</option>
-                  <option value="outstanding">Only those who owe</option>
-                </select>
-                <button
-                  className="icon-btn"
-                  aria-label="Refresh customers"
-                  onClick={workspace.refresh}
-                >
-                  <RefreshCw size={16} />
-                </button>
+
+                {totals.customers === 0 && !loading ? (
+                  <section className="k-card k-row-card">
+                    <div>
+                      <h2>Add your first customer</h2>
+                      <p className="k-muted">Then say or type their udhaar.</p>
+                    </div>
+                    <button className="k-btn k-btn-primary" onClick={() => open("customer")}>
+                      <Plus size={15} />
+                      Add customer
+                    </button>
+                  </section>
+                ) : (
+                  <section className="k-card k-flush">
+                    <div className="k-card-head">
+                      <h2>Recent</h2>
+                      <button className="k-link" onClick={() => navigate("entries")}>
+                        See all <ChevronRight size={14} />
+                      </button>
+                    </div>
+                    {loading ? <Loading /> : <EntryList entries={entries.slice(0, 5)} reversals={reversals} name={customerName} />}
+                  </section>
+                )}
               </div>
-              {loading ? (
-                <Loading />
-              ) : filteredCustomers.length ? (
-                <div className="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Customer</th>
-                        <th>Landmark</th>
-                        <th>Phone</th>
-                        <th>Baaki</th>
-                        <th>Sunday reminder</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredCustomers.map((c) => (
-                        <tr key={c.id}>
-                          <td>
-                            <button
-                              className="customer-name link-cell"
-                              onClick={() => setDetailCustomer(c.id)}
-                              aria-label={`Open ${c.name}`}
-                            >
-                              <span className="table-avatar">{c.name[0].toUpperCase()}</span>
-                              <strong>{c.name}</strong>
-                            </button>
-                          </td>
-                          <td>{c.displayLabel || <span className="subtle">—</span>}</td>
-                          <td>{c.phone ? displayPhone(c.phone) : <span className="subtle">No phone</span>}</td>
-                          <td className="amount-cell">{money(c.balancePaise)}</td>
-                          <td>
-                            <span className="subtle">
-                              {!c.phone
-                                ? "Skipped · no phone"
-                                : consents[c.id] === "opted_in"
-                                  ? "Agreed"
-                                  : consents[c.id] === "opted_out"
-                                    ? "Said no"
-                                    : "Not asked yet"}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              className="text-button"
-                              onClick={() => {
-                                setSelectedCustomer(c.id);
-                                open("entry");
-                              }}
-                            >
-                              New entry
-                              <Plus size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <Empty
-                  icon={<UsersRound size={25} />}
-                  title={search ? "No matching customers" : "Your regulars belong here."}
-                  description={
-                    search
-                      ? "Try a different name, or load more customers below."
-                      : "Add the people who take udhaar from your shop."
-                  }
-                  action="Add customer"
-                  onClick={() => requireOwner("customer")}
-                />
-              )}
-              <div className="table-bottom">
-                <span>Showing {customers.length} customers</span>
+            )}
+
+            {tab === "customers" && (
+              <section className="k-card k-flush">
+                <Toolbar search={search} setSearch={setSearch} placeholder="Search customers">
+                  <select aria-label="Sort customers" value={filter} onChange={(e) => setFilter(e.target.value)}>
+                    <option value="all">A–Z</option>
+                    <option value="highest">Highest due</option>
+                    <option value="due">Only who owe</option>
+                  </select>
+                </Toolbar>
+                {loading ? (
+                  <Loading />
+                ) : filteredCustomers.length ? (
+                  <ul className="k-list">
+                    {filteredCustomers.map((c) => (
+                      <CustomerRow key={c.id} customer={c} onOpen={() => setDetailCustomer(c.id)} />
+                    ))}
+                  </ul>
+                ) : (
+                  <Empty
+                    title={search ? "No matching customers" : "No customers yet"}
+                    action={search ? undefined : "Add customer"}
+                    onClick={() => open("customer")}
+                  />
+                )}
                 {workspace.hasMoreCustomers && (
-                  <button className="text-button" onClick={workspace.loadCustomers}>
-                    Load 50 more
-                    <ChevronDown size={14} />
-                  </button>
+                  <button className="k-more" onClick={workspace.loadCustomers}>Show more</button>
                 )}
-              </div>
-            </section>
-          )}
+              </section>
+            )}
 
-          {tab === "Ledger" && (
-            <section className="panel data-panel">
-              <div className="table-toolbar">
-                <div className="search-field">
-                  <Search size={16} />
-                  <input
-                    aria-label="Search entries"
-                    placeholder="Search by name or note…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+            {tab === "entries" && (
+              <section className="k-card k-flush">
+                <Toolbar search={search} setSearch={setSearch} placeholder="Search name or note">
+                  <select aria-label="Filter entries" value={filter} onChange={(e) => setFilter(e.target.value)}>
+                    <option value="all">All</option>
+                    <option value="credit">Udhaar given</option>
+                    <option value="payment">Payments got</option>
+                    <option value="reversal">Corrections</option>
+                    <option value="reversed">Cancelled</option>
+                  </select>
+                </Toolbar>
+                {loading ? (
+                  <Loading />
+                ) : filteredEntries.length ? (
+                  <EntryList
+                    entries={filteredEntries}
+                    reversals={reversals}
+                    name={customerName}
+                    onEdit={setEditingEntry}
+                    onReverse={startReversal}
                   />
-                </div>
-                <select
-                  aria-label="Filter ledger"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                >
-                  <option value="all">All entries</option>
-                  <option value="credit">Udhaar given</option>
-                  <option value="payment">Payments received</option>
-                  <option value="reversal">Corrections</option>
-                  <option value="reversed">Cancelled entries</option>
-                </select>
-                <button
-                  className="button secondary small"
-                  disabled={!filteredEntries.length}
-                  onClick={exportLedger}
-                >
-                  <Download size={14} />
-                  Download CSV
-                </button>
-                <button
-                  className="icon-btn"
-                  aria-label="Refresh ledger"
-                  onClick={workspace.refresh}
-                >
-                  <RefreshCw size={16} />
-                </button>
-              </div>
-              {loading ? (
-                <Loading />
-              ) : filteredEntries.length ? (
-                <div className="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Customer</th>
-                        <th>Type</th>
-                        <th>Amount</th>
-                        <th>Date</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredEntries.map((e) => (
-                        <tr key={e.id}>
-                          <td>
-                            <strong>{customerName(e.customerId)}</strong>
-                            {(e.notes || e.reason) && (
-                              <small className="table-small">{e.notes || e.reason}</small>
-                            )}
-                            <small className="table-small">
-                              {e.source === "assistant" ? "Via assistant" : e.source === "whatsapp" ? "Via WhatsApp" : "Added here"}
-                            </small>
-                          </td>
-                          <td>
-                            <span className={`entry-tag ${e.type}`}>
-                              {reversals.has(e.id)
-                                ? "Cancelled"
-                                : e.type === "credit"
-                                  ? "Udhaar"
-                                  : e.type === "payment"
-                                    ? "Payment"
-                                    : "Correction"}
-                            </span>
-                          </td>
-                          <td
-                            className={`amount-cell ${reversals.has(e.id) ? "reversed-text" : ""}`}
-                          >
-                            {e.signedAmountPaise > 0 ? "+" : "−"}
-                            {money(Math.abs(e.signedAmountPaise))}
-                          </td>
-                          <td>{e.createdAt ? dateFormat.format(e.createdAt.toDate()) : "—"}</td>
-                          <td>
-                            {e.type !== "reversal" && !reversals.has(e.id) ? (
-                              <span className="row-actions">
-                                <button className="text-button" onClick={() => setEditingEntry(e)}>
-                                  <Pencil size={13} />
-                                  Fix amount
-                                </button>
-                                <button
-                                  className="text-button reverse-button"
-                                  onClick={() => {
-                                    setError("");
-                                    setReason("");
-                                    operation.current = null;
-                                    setReversing(e);
-                                  }}
-                                >
-                                  <Undo2 size={13} />
-                                  Cancel entry
-                                </button>
-                              </span>
-                            ) : (
-                              <span className="subtle">Kept for history</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <Empty
-                  icon={<BookOpen size={25} />}
-                  title={search ? "No matching entries" : "No entries yet."}
-                  description="Every udhaar and payment you record will appear here."
-                  action="Add entry"
-                  onClick={() => requireOwner("entry")}
-                />
-              )}
-              <div className="table-bottom">
-                <span>Showing {entries.length} entries</span>
+                ) : (
+                  <Empty
+                    title={search ? "No matching entries" : "No entries yet"}
+                    action={search ? undefined : "Speak an entry"}
+                    onClick={speak}
+                  />
+                )}
                 {workspace.hasMoreEntries && (
-                  <button className="text-button" onClick={workspace.loadEntries}>
-                    Load 50 more
-                    <ChevronDown size={14} />
-                  </button>
-                )}
-              </div>
-            </section>
-          )}
-
-          {tab === "Connections" && (
-            <>
-              <div className="panel firebase-panel">
-                <div className="firebase-heading">
-                  <span className="firebase-symbol">
-                    <Flame size={27} />
-                  </span>
-                  <div>
-                    <h2>Firebase</h2>
-                    <p>Your primary backend infrastructure</p>
-                  </div>
-                  <span className="pill green">
-                    <span className="tiny-dot" />
-                    WEB SDK CONFIGURED
-                  </span>
-                </div>
-                <div className="connection-details">
-                  <div>
-                    <small>PROJECT</small>
-                    <strong>{projectId}</strong>
-                  </div>
-                  <div>
-                    <small>AUTHENTICATION</small>
-                    <strong>{user ? "Google account signed in" : "Not signed in"}</strong>
-                  </div>
-                  <div>
-                    <small>CLOUD FIRESTORE</small>
-                    <strong>{shop ? "Shop read verified" : "Awaiting owner sign-in"}</strong>
-                  </div>
-                </div>
-                <div className="connection-foot">
-                  <span>
-                    <ShieldCheck size={15} />
-                    Admin credentials stay on the server.
-                  </span>
-                  <button
-                    className="button secondary small"
-                    onClick={checkConnection}
-                    disabled={connection === "checking"}
-                  >
-                    {connection === "checking" ? (
-                      <LoaderCircle size={14} className="spin" />
-                    ) : (
-                      <RefreshCw size={14} />
-                    )}
-                    Verify API connection
-                  </button>
-                </div>
-                {connectionMessage && (
-                  <p
-                    role="status"
-                    className={`connection-result ${connection === "error" ? "error-text" : ""}`}
-                  >
-                    {connectionMessage}
-                  </p>
-                )}
-              </div>
-              <div className="section-heading">
-                <h2>Integrations</h2>
-                <p>Live state reported by the server. Never connected by assumption.</p>
-              </div>
-              <IntegrationsGrid
-                integrations={
-                  integrations && integrations.uid === user?.uid ? integrations.list : null
-                }
-              />
-              <ParserEval />
-              <section className="panel settings-card">
-                <h2>Gnani voice-to-text</h2>
-                <p>
-                  Turns what you say to the assistant into text. The key lives only on the server
-                  (<code>GNANI_API_KEY</code> in Vercel). This test sends one second of silence.
-                </p>
-                <button
-                  className="button secondary small"
-                  onClick={() => void testGnani()}
-                  disabled={gnaniCheck === "checking"}
-                >
-                  {gnaniCheck === "checking" ? <LoaderCircle size={14} className="spin" /> : <AudioLines size={14} />}
-                  Test Gnani key
-                </button>
-                {gnaniCheck && gnaniCheck !== "checking" && (
-                  <p role="status" className={gnaniCheck.ok ? "form-success" : "form-error"}>
-                    {gnaniCheck.detail}
-                  </p>
+                  <button className="k-more" onClick={workspace.loadEntries}>Show more</button>
                 )}
               </section>
-              <div className="policy-note">
-                <ShieldCheck size={23} />
-                <div>
-                  <h3>Reminders are intentionally disabled.</h3>
-                  <p>
-                    There is no reminder sender in this release. Written Meta/BSP approval, verified
-                    opt-in, and a separate implementation review are required before customer
-                    reminders can be enabled. No billing or deployment has been initiated.
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
+            )}
 
-          {(tab === "Activity" || tab === "Reminders") &&
-            (shop ? (
-              tab === "Activity" ? (
-                <ActivityPanel shopId={shop.id} customerName={customerName} />
-              ) : (
-                <RemindersPanel shopId={shop.id} customerName={customerName} />
-              )
-            ) : (
-              <section className="panel">
-                <Empty
-                  icon={<ShieldCheck size={24} />}
-                  title="Sign in to see your shop."
-                  description="Activity and reminder records are private to the shop owner."
-                  action="Sign in as owner"
-                  onClick={() => open("login")}
-                />
-              </section>
-            ))}
-
-          {tab === "Settings" && (
-            <div className="settings-grid">
-              <section className="panel settings-card">
-                <h2>Your shop</h2>
-                <dl>
-                  <div>
-                    <dt>Shop</dt>
-                    <dd>{shop?.name || "Not created yet"}</dd>
-                  </div>
-                  <div>
-                    <dt>Signed in as</dt>
-                    <dd>{user?.email || "Not signed in"}</dd>
-                  </div>
-                  <div>
-                    <dt>Currency</dt>
-                    <dd>₹ Rupees</dd>
-                  </div>
-                </dl>
-                {shop && (
-                  <label className="language-setting">
+            {tab === "settings" && (
+              <div className="k-stack">
+                <section className="k-card">
+                  <h2>Your shop</h2>
+                  <dl className="k-dl">
+                    <div>
+                      <dt>Shop</dt>
+                      <dd>{shop?.name}</dd>
+                    </div>
+                    <div>
+                      <dt>Signed in as</dt>
+                      <dd>{user.email}</dd>
+                    </div>
+                  </dl>
+                  <label className="k-field">
                     Language you speak in the shop
                     <select
-                      value={shop.language || "hinglish"}
+                      value={shop?.language || "hinglish"}
                       disabled={busy}
                       onChange={(e) => void saveLanguage(e.currentTarget.value)}
                     >
@@ -1358,77 +598,96 @@ export default function Dashboard() {
                       <option value="mr">मराठी Marathi (+ Hindi)</option>
                       <option value="gu">ગુજરાતી Gujarati (+ Hindi)</option>
                     </select>
-                    <small className="subtle">The assistant listens for this language. English words like “Surf” always work.</small>
+                    <small className="k-muted">English words like “Surf” or “Maggi” always work.</small>
                   </label>
-                )}
-                {user ? (
-                  <button className="button secondary" onClick={() => void logout()}>
-                    <LogOut size={15} />
+                </section>
+                <section className="k-card k-flush">
+                  <button className="k-menu-row" onClick={() => open("help")}>
+                    <ShieldCheck size={16} />
+                    How it works & safety
+                    <ChevronRight size={15} />
+                  </button>
+                  <button className="k-menu-row" onClick={() => navigate("advanced")}>
+                    <Settings2 size={16} />
+                    Setup & status
+                    <ChevronRight size={15} />
+                  </button>
+                  <button className="k-menu-row" onClick={() => void logout()}>
+                    <LogOut size={16} />
                     Sign out
                   </button>
-                ) : (
-                  <button className="button primary" onClick={() => open("login")}>
-                    Sign in with Google
-                    <ArrowRight size={15} />
+                </section>
+              </div>
+            )}
+
+            {tab === "advanced" && shop && (
+              <div className="k-stack k-advanced">
+                <button className="k-link" onClick={() => navigate("settings")}>← Settings</button>
+                <section className="k-card">
+                  <h2>Connection</h2>
+                  <p className="k-muted">Firebase project <code>{projectId}</code>. Admin keys stay on the server.</p>
+                  <button className="k-btn" onClick={() => void checkConnection()} disabled={connection === "checking"}>
+                    {connection === "checking" && <LoaderCircle size={14} className="spin" />}
+                    Verify connection
                   </button>
-                )}
-              </section>
-              <section className="panel settings-card">
-                <h2>More</h2>
-                <p>Setup status, for whoever manages Udhaar for you.</p>
-                <div className="more-links">
-                  <button className="button secondary small" onClick={() => navigate("Reminders")}>
-                    <BellRing size={14} />
-                    Sunday reminders
+                  {connectionMessage && (
+                    <p role="status" className={connection === "error" ? "form-error" : "form-success"}>
+                      {connectionMessage}
+                    </p>
+                  )}
+                  <IntegrationsGrid integrations={integrations && integrations.uid === user.uid ? integrations.list : null} />
+                </section>
+                <section className="k-card">
+                  <h2>Gnani voice-to-text</h2>
+                  <p className="k-muted">Sends one second of silence to check the server key.</p>
+                  <button className="k-btn" onClick={() => void testGnani()} disabled={gnaniCheck === "checking"}>
+                    {gnaniCheck === "checking" ? <LoaderCircle size={14} className="spin" /> : <AudioLines size={14} />}
+                    Test Gnani key
                   </button>
-                  <button className="button secondary small" onClick={() => navigate("Connections")}>
-                    <Link2 size={14} />
-                    Connections & setup status
-                  </button>
-                </div>
-              </section>
-            </div>
-          )}
-            </>
-          )}
-          <footer className="page-footer">
-            <span>
-              <span className="footer-dot" />
-              Made for the way your shop works.
-            </span>
-            <span>Speak simply. Keep clearly.</span>
-          </footer>
-        </div>
+                  {gnaniCheck && gnaniCheck !== "checking" && (
+                    <p role="status" className={gnaniCheck.ok ? "form-success" : "form-error"}>{gnaniCheck.detail}</p>
+                  )}
+                </section>
+                <ParserEval />
+                <ActivityPanel shopId={shop.id} customerName={customerName} />
+                <RemindersPanel shopId={shop.id} customerName={customerName} />
+              </div>
+            )}
+          </>
+        )}
       </main>
 
+      <nav className="k-tabbar" aria-label="Main navigation (mobile)">
+        {NAV.slice(0, 2).map((item) => (
+          <TabButton key={item.id} item={item} active={tab === item.id} onClick={() => navigate(item.id)} />
+        ))}
+        <button className="k-fab" aria-label="Speak an entry" onClick={speak}>
+          <Mic size={22} />
+        </button>
+        {NAV.slice(2).map((item) => (
+          <TabButton
+            key={item.id}
+            item={item}
+            active={tab === item.id || (item.id === "settings" && tab === "advanced")}
+            onClick={() => navigate(item.id)}
+          />
+        ))}
+      </nav>
+
       {dialog === "login" && (
-        <Modal
-          title="Welcome to your khata."
-          eyebrow="OWNER SIGN-IN"
-          close={() => !busy && setDialog(null)}
-        >
+        <Modal title="Welcome to your khata." eyebrow="OWNER SIGN-IN" close={() => !busy && setDialog(null)}>
           <div className="form">
-            <p className="modal-description">
-              Continue with your Google account. New here? You’ll name your shop next.
-            </p>
+            <p className="modal-description">Continue with Google. New here? You’ll name your shop next.</p>
             {error && <p className="form-error" role="alert">{error}</p>}
             <GoogleSignInButton busy={busy} onClick={() => void submitLogin()} />
-            <div className="form-note">
-              <ShieldCheck size={15} />
-              Only you can see your shop’s khata.
-            </div>
           </div>
         </Modal>
       )}
       {dialog === "customer" && (
-        <Modal
-          title="Add a customer"
-          eyebrow="NEW CUSTOMER"
-          close={() => !busy && setDialog(null)}
-        >
+        <Modal title="Add a customer" close={() => !busy && setDialog(null)}>
           <form className="form" onSubmit={submitCustomer}>
             <label>
-              Customer name
+              Name
               <input
                 name="name"
                 required
@@ -1446,44 +705,32 @@ export default function Dashboard() {
             )}
             <label>
               Landmark {duplicateOf.length ? "" : <span className="subtle">(optional)</span>}
-              <input
-                name="label"
-                maxLength={150}
-                placeholder="e.g. Near the temple, Gali no. 3"
-                required={duplicateOf.length > 0}
-              />
+              <input name="label" maxLength={150} placeholder="e.g. Near the temple" required={duplicateOf.length > 0} />
             </label>
             <label>
-              Phone number <span className="subtle">(optional)</span>
+              Phone <span className="subtle">(optional)</span>
               <input name="phone" type="tel" inputMode="tel" placeholder="98765 43210" />
             </label>
-            <p className="form-note">We never message a customer without their permission.</p>
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
+            {error && <p className="form-error" role="alert">{error}</p>}
             <button className="button primary full" disabled={busy || !shop}>
               {busy && <LoaderCircle size={16} className="spin" />}Add customer
             </button>
-            {!shop && <p className="form-error">Create your shop before adding customers.</p>}
           </form>
         </Modal>
       )}
       {dialog === "entry" && (
-        <Modal title="New entry" eyebrow="UDHAAR OR PAYMENT" close={() => !busy && setDialog(null)}>
+        <Modal
+          title={entryAction === "add_credit" ? "Udhaar diya" : "Paisa mila"}
+          eyebrow={entryAction === "add_credit" ? "YOU GAVE" : "YOU GOT"}
+          close={() => !busy && setDialog(null)}
+        >
           {!customers.length ? (
-            <Empty
-              icon={<UsersRound size={24} />}
-              title="Add a customer first."
-              description="Then you can record their udhaar or payment."
-              action="Add customer"
-              onClick={() => open("customer")}
-            />
+            <Empty title="Add a customer first" action="Add customer" onClick={() => open("customer")} />
           ) : (
             <EntryForm
               customers={customers}
               initialCustomer={selectedCustomer}
+              initialAction={entryAction}
               busy={busy}
               error={error}
               disabled={!shop}
@@ -1493,26 +740,16 @@ export default function Dashboard() {
         </Modal>
       )}
       {reversing && (
-        <Modal
-          title="Cancel this entry?"
-          eyebrow="FIX A MISTAKE"
-          close={() => !busy && setReversing(null)}
-        >
+        <Modal title="Cancel this entry?" eyebrow="FIX A MISTAKE" close={() => !busy && setReversing(null)}>
           <p className="modal-description">
             Cancel the {money(Math.abs(reversing.signedAmountPaise))}{" "}
-            {reversing.type === "credit" ? "udhaar" : "payment"} for{" "}
-            <strong>{customerName(reversing.customerId)}</strong>? Their balance will be corrected.
+            {reversing.type === "credit" ? "udhaar" : "payment"} for <strong>{customerName(reversing.customerId)}</strong>?
             The original stays in history, marked as cancelled.
           </p>
           <form className="form" onSubmit={submitReversal}>
             <div className="reason-chips" role="group" aria-label="Why?">
               {["Wrong amount", "Wrong customer", "Entered twice", "Customer returned items"].map((r) => (
-                <button
-                  type="button"
-                  key={r}
-                  aria-pressed={reason === r}
-                  onClick={() => setReason(r)}
-                >
+                <button type="button" key={r} aria-pressed={reason === r} onClick={() => setReason(r)}>
                   {r}
                 </button>
               ))}
@@ -1529,76 +766,22 @@ export default function Dashboard() {
                 onChange={(e) => setReason(e.currentTarget.value)}
               />
             </label>
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
+            {error && <p className="form-error" role="alert">{error}</p>}
             <button className="button danger full" disabled={busy}>
-              {busy ? <LoaderCircle size={16} className="spin" /> : <Undo2 size={16} />}Yes, cancel
-              entry
+              {busy ? <LoaderCircle size={16} className="spin" /> : <Undo2 size={16} />}Yes, cancel entry
             </button>
           </form>
         </Modal>
       )}
-      {dialog === "voice" && (
-        <Modal
-          title="Your voice. One clear action."
-          eyebrow="VOICE COMMANDS · PREVIEW"
-          close={() => setDialog(null)}
-        >
-          <p className="modal-description">
-            Say these to the assistant on your Home screen, or type them.
-          </p>
-          <div className="command-examples">
-            {[
-              ["Add credit", "“Ramesh ko 340 rupaye ka udhaar likh do.”"],
-              ["Record a payment", "“Sunita ne 200 rupaye diye.”"],
-              ["Check a balance", "“Ramesh ka kitna baaki hai?”"],
-              ["Correct a mistake", "Reply “GALAT” to the confirmation."],
-            ].map(([label, text]) => (
-              <div key={label}>
-                <small>{label}</small>
-                <p>{text}</p>
-              </div>
-            ))}
-          </div>
-          <p className="form-note">
-            <ShieldCheck size={15} />
-            If a name or amount is unclear, the agent must ask—not guess.
-          </p>
-          <button
-            className="button primary full"
-            onClick={() => {
-              setDialog(null);
-              navigate("Overview");
-            }}
-          >
-            Go to the assistant
-            <ArrowRight size={15} />
-          </button>
-        </Modal>
-      )}
       {dialog === "help" && (
-        <Modal title="A khata you can trust." eyebrow="HELP & SAFETY" close={() => setDialog(null)}>
+        <Modal title="How Udhaar works" close={() => setDialog(null)}>
           <div className="help-content">
-            <h3>How entries work</h3>
-            <p>
-              Udhaar given adds to what a customer owes you. A payment received reduces it.
-            </p>
+            <h3>Speak like you talk</h3>
+            <p>“Ramesh ko 340 ka udhaar likh do” · “Sunita ne 200 diye” · “Ramesh ka kitna baaki hai?”</p>
+            <h3>It never guesses</h3>
+            <p>If a name or amount is unclear, the assistant asks before saving anything.</p>
             <h3>Made a mistake?</h3>
-            <p>
-              Open Entries and tap “Fix amount” or “Cancel entry”. The old entry stays in history so
-              your khata can always be trusted.
-            </p>
-            <h3>Can’t access your shop?</h3>
-            <p>
-              Sign in with the same Google account you used when you created your shop.
-            </p>
-            <h3>Need human help?</h3>
-            <p>
-              Contact the person who set up Udhaar for you.
-            </p>
+            <p>Tap Undo on the reply, or open Entries and choose Fix or Cancel. History is always kept.</p>
           </div>
         </Modal>
       )}
@@ -1608,17 +791,12 @@ export default function Dashboard() {
           customerId={detailCustomer}
           close={() => setDetailCustomer(null)}
           onChanged={workspace.refresh}
-          onReverse={(e) => {
-            setDetailCustomer(null);
-            setError("");
-            setReason("");
-            operation.current = null;
-            setReversing(e);
-          }}
+          onReverse={startReversal}
           onEdit={(e) => {
             setDetailCustomer(null);
             setEditingEntry(e);
           }}
+          onAdd={(action) => openEntry(action, detailCustomer)}
         />
       )}
       {editingEntry && (
@@ -1629,7 +807,7 @@ export default function Dashboard() {
           done={(balance) => {
             setEditingEntry(null);
             workspace.refresh();
-            notify(`Fixed. New balance: ${money(balance)}.`);
+            setToast(`Fixed. New balance: ${money(balance)}.`);
           }}
         />
       )}
@@ -1647,17 +825,11 @@ export default function Dashboard() {
         />
       )}
       {toast && (
-        <div className="toast" role="status">
-          <span>
-            <Check size={17} />
-          </span>
-          {toast}
-          <button
-            className="icon-btn"
-            aria-label="Dismiss notification"
-            onClick={() => setToast("")}
-          >
-            <X size={16} />
+        <div className="k-toast" role="status">
+          <Check size={16} />
+          <span>{toast}</span>
+          <button aria-label="Dismiss notification" onClick={() => setToast("")}>
+            <X size={15} />
           </button>
         </div>
       )}
@@ -1665,89 +837,138 @@ export default function Dashboard() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  icon,
-  note,
-  color,
-}: {
-  label: string;
-  value: string;
-  icon: ReactNode;
-  note: string;
-  color: string;
-}) {
-  return (
-    <div className="stat-card">
-      <div className="stat-top">
-        <span>{label}</span>
-        <span className={`stat-icon ${color}`}>{icon}</span>
-      </div>
-      <div className="stat-value">{value}</div>
-      <div className="stat-note">
-        <span />
-        {note}
-      </div>
-    </div>
-  );
-}
-function SetupStep({
-  done,
-  title,
-  detail,
+function TabButton({
+  item,
+  active,
   onClick,
 }: {
-  done?: boolean;
-  title: string;
-  detail: string;
-  onClick?(): void;
-}) {
-  return (
-    <button
-      className={`setup-step ${done ? "done" : ""}`}
-      disabled={done || !onClick}
-      onClick={onClick}
-    >
-      <span className="step-check">{done && <Check size={12} strokeWidth={3} />}</span>
-      <span>
-        <strong>{title}</strong>
-        <small>{detail}</small>
-      </span>
-      {!done && <ChevronRight size={14} />}
-    </button>
-  );
-}
-function Empty({
-  icon,
-  title,
-  description,
-  action,
-  onClick,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  action: string;
+  item: (typeof NAV)[number];
+  active: boolean;
   onClick(): void;
 }) {
   return (
-    <div className="empty-state">
-      <span className="empty-icon">{icon}</span>
-      <h3>{title}</h3>
-      <p>{description}</p>
-      <button className="text-button" onClick={onClick}>
-        {action}
-        <ArrowRight size={14} />
-      </button>
+    <button className={active ? "active" : ""} aria-current={active ? "page" : undefined} onClick={onClick}>
+      <item.icon size={19} />
+      <span>{item.label}</span>
+    </button>
+  );
+}
+
+function Toolbar({
+  search,
+  setSearch,
+  placeholder,
+  children,
+}: {
+  search: string;
+  setSearch(v: string): void;
+  placeholder: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="k-toolbar">
+      <label className="k-search">
+        <Search size={15} />
+        <input aria-label={placeholder} placeholder={placeholder} value={search} onChange={(e) => setSearch(e.target.value)} />
+      </label>
+      {children}
     </div>
   );
 }
+
+function CustomerRow({ customer: c, onOpen }: { customer: Customer; onOpen(): void }) {
+  return (
+    <li>
+      <button className="k-row" onClick={onOpen}>
+        <span className="k-avatar" aria-hidden="true">{initial(c.name)}</span>
+        <span className="k-row-main">
+          <strong>{c.name}</strong>
+          <small>{[c.displayLabel, c.phone ? displayPhone(c.phone) : ""].filter(Boolean).join(" · ") || "No details"}</small>
+        </span>
+        <span className="k-row-amount">
+          <strong className={c.balancePaise > 0 ? "k-due" : c.balancePaise < 0 ? "k-adv" : ""}>
+            {money(Math.abs(c.balancePaise))}
+          </strong>
+          <small>{c.balancePaise > 0 ? "due" : c.balancePaise < 0 ? "advance" : "settled"}</small>
+        </span>
+      </button>
+    </li>
+  );
+}
+
+function EntryList({
+  entries,
+  reversals,
+  name,
+  onEdit,
+  onReverse,
+}: {
+  entries: Entry[];
+  reversals: Set<string>;
+  name(id: string): string;
+  onEdit?(e: Entry): void;
+  onReverse?(e: Entry): void;
+}) {
+  if (!entries.length) return <Empty title="No entries yet" />;
+  return (
+    <ul className="k-list">
+      {entries.map((e) => {
+        const cancelled = reversals.has(e.id);
+        const gave = e.signedAmountPaise > 0;
+        const label = cancelled ? "Cancelled" : e.type === "reversal" ? "Correction" : gave ? "You gave" : "You got";
+        return (
+          <li key={e.id} className={`k-entry ${cancelled ? "is-cancelled" : ""}`}>
+            <span className="k-avatar" aria-hidden="true">{initial(name(e.customerId))}</span>
+            <span className="k-row-main">
+              <strong>{name(e.customerId)}</strong>
+              <small>
+                {[when(e), e.notes || e.reason, e.source === "assistant" ? "by voice" : ""].filter(Boolean).join(" · ")}
+              </small>
+              {onEdit && onReverse && e.type !== "reversal" && !cancelled && (
+                <span className="k-entry-actions">
+                  <button className="k-link" onClick={() => onEdit(e)}>
+                    <Pencil size={12} />
+                    Fix amount
+                  </button>
+                  <button className="k-link" onClick={() => onReverse(e)}>
+                    <Undo2 size={12} />
+                    Cancel entry
+                  </button>
+                </span>
+              )}
+            </span>
+            <span className="k-row-amount">
+              <strong className={cancelled ? "k-struck" : gave ? "k-due" : "k-adv"}>
+                {gave ? "+" : "−"}
+                {money(Math.abs(e.signedAmountPaise))}
+              </strong>
+              <small>{label}</small>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Empty({ title, action, onClick }: { title: string; action?: string; onClick?(): void }) {
+  return (
+    <div className="k-empty">
+      <p>{title}</p>
+      {action && onClick && (
+        <button className="k-btn" onClick={onClick}>
+          {action}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Loading() {
   return (
-    <div className="loading-state">
-      <LoaderCircle size={22} className="spin" />
-      <span>Opening your khata…</span>
+    <div className="k-empty" role="status">
+      <LoaderCircle size={18} className="spin" />
+      <span className="k-muted">Loading…</span>
     </div>
   );
 }

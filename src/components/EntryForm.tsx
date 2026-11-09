@@ -10,6 +10,7 @@ import type { Customer } from "../lib/useWorkspace";
 export function EntryForm({
   customers,
   initialCustomer,
+  initialAction = "add_credit",
   busy,
   error,
   disabled,
@@ -17,13 +18,14 @@ export function EntryForm({
 }: {
   customers: Customer[];
   initialCustomer: string;
+  initialAction?: "add_credit" | "add_payment";
   busy: boolean;
   error: string;
   disabled: boolean;
   onSubmit(e: FormEvent<HTMLFormElement>): void;
 }) {
   const [customerId, setCustomerId] = useState(initialCustomer);
-  const [action, setAction] = useState<"add_credit" | "add_payment">("add_credit");
+  const [action, setAction] = useState<"add_credit" | "add_payment">(initialAction);
   const [amount, setAmount] = useState("");
   const customer = customers.find((c) => c.id === customerId);
   let paise: number | null = null;

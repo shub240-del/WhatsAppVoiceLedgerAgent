@@ -8,7 +8,8 @@ import type { Customer, Entry, useWorkspace } from "../../src/lib/useWorkspace";
 
 const at = (min: number) => ({ toDate: () => new Date(Date.UTC(2026, 10, 9, 6, 0) - min * 60_000) });
 const params = new URLSearchParams(location.search);
-const empty = params.has("empty") || params.has("new");
+const guest = params.has("guest");
+const empty = params.has("empty") || params.has("new") || guest;
 window.__requests = [];
 Object.defineProperty(auth, "currentUser", { get: () => ({ getIdToken: async () => "test-token" }) });
 window.fetch = (async (url: string, init: RequestInit) => {
@@ -32,9 +33,9 @@ const entries: Entry[] = empty
       { id: "e4", customerId: "c1", type: "credit", signedAmountPaise: 90000, notes: "Atta 10kg", createdBy: "u", source: "manual", createdAt: at(1500) },
     ];
 const data = {
-  user: { uid: "u1", email: "owner@example.com" },
+  user: guest ? null : { uid: "u1", email: "owner@example.com" },
   authReady: true,
-  shop: params.has("new") ? null : { id: "s1", name: "Sharma Kirana", language: "hinglish" },
+  shop: params.has("new") || guest ? null : { id: "s1", name: "Sharma Kirana", language: "hinglish" },
   customers,
   entries,
   reversals: new Set<string>(["e3"]),

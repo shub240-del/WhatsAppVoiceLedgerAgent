@@ -128,3 +128,38 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* Pop-ups (sign-in, add customer, new entry): calm neutral text, readable sizes, one green. */
+.modal { color: #18181b !important; border-color: #e6e6e9 !important; }
+.modal-head h2 { font-size: 19px !important; letter-spacing: -0.01em !important; color: #18181b !important; }
+.modal-head .eyebrow { font-size: 11px !important; letter-spacing: 0.06em; }
+.modal .modal-description { font-size: 14px !important; color: #3f3f46 !important; }
+.modal .form > label,
+.modal .form-columns > label,
+.modal .form legend {
+  font-size: 13px !important;
+  color: #3f3f46 !important;
+}
+.modal .form .subtle { color: #5d5d66 !important; }
+.modal .form input:not([type="checkbox"]):not([type="radio"]),
+.modal .form select,
+.modal .form textarea {
+  background: #fff !important;
+  border-color: #d9d9de !important;
+  color: #18181b !important;
+  font-size: 15px !important; /* 15px+ stops iPhones zooming into the field */
+}
+.modal .form input:focus,
+.modal .form select:focus,
+.modal .form textarea:focus {
+  outline: none;
+  border-color: #0f7a4d !important;
+  box-shadow: 0 0 0 3px #e8f4ee !important;
+}
+.modal .button.primary { background: #0f7a4d !important; border-color: #0f7a4d !important; color: #fff !important; }
+.modal .button.primary:hover:not(:disabled) { background: #0c6a42 !important; }
+.modal .form-error,
+.modal .form-success,
+.modal .form-note { font-size: 13px !important; }
+.modal .form-error { color: #9f2d24 !important; background: #fdf0ef !important; }
+.modal .auth-form > .form { margin-top: 0; }

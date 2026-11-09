@@ -13,16 +13,18 @@ test("landing says what Udhaar is in one screen", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test("start, log in, privacy and terms open their dialogs", async ({ page }) => {
+test("'Try it now' opens the product without sign-up; Log in, privacy and terms open dialogs", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Open my khata" }).click();
-  let dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "A fresh start for your shop." })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Try it now" }).click();
+  await expect(page).toHaveURL(/#\/workspace$/);
+  await expect(page.getByText("You’re trying Udhaar.")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.goto("/");
   await page.getByRole("banner").getByRole("button", { name: "Log in", exact: true }).click();
-  dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "Welcome back to your khata." })).toBeVisible();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  await expect(dialog.getByLabel("Email")).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("contentinfo").getByRole("button", { name: "Privacy" }).click();
   await expect(page.getByRole("dialog").getByRole("heading", { name: "How we handle your records" })).toBeVisible();

@@ -1,12 +1,14 @@
 import { test, expect } from "@playwright/test";
 
-test("signed-out workspace asks the owner to sign in, nothing else", async ({ page }) => {
+test("signed-out visitor gets the real product as a guest, with no data and no sign-in wall", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/#/workspace");
-  await expect(page.getByRole("heading", { name: "Sign in to open your khata" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
-  await expect(page.getByText("Ramesh", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("You’re trying Udhaar.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Voice assistant" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Sign up free" }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Create your free account" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

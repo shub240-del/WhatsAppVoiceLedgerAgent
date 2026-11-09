@@ -106,3 +106,19 @@ test("accessibility: no serious or critical axe violations", async ({ page }) =>
   const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 });
+
+test("after sign-in, what the guest said earlier is sent once, automatically", async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem("seeded")) {
+      sessionStorage.setItem("seeded", "1");
+      sessionStorage.setItem("udhaar.pendingTurn", JSON.stringify({ body: { text: "Sunita ko 340" }, shown: "Sunita ko 340", voice: false }));
+    }
+  });
+  await page.goto("/tests/harness/assistant.html");
+  await expect.poll(() => page.evaluate(() => window.__requests.length)).toBe(1);
+  expect(await page.evaluate(() => window.__requests[0].text)).toBe("Sunita ko 340");
+  expect(await page.evaluate(() => sessionStorage.getItem("udhaar.pendingTurn"))).toBeNull();
+  await page.reload();
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => window.__requests.length)).toBe(0);
+});

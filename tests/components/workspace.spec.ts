@@ -79,3 +79,41 @@ test("read-aloud can be switched off and stays off", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("button", { name: "Read replies aloud" })).toHaveAttribute("aria-pressed", "false");
 });
+
+test("guest: lands in the product, can type, and is asked to sign up only when saving", async ({ page }) => {
+  await page.goto("/tests/harness/workspace.html?guest#/workspace/home");
+  await expect(page.getByText("You’re trying Udhaar.")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByLabel("Type a message").fill("Ramesh ko 340 ka udhaar");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Create your free account" })).toBeVisible();
+  await expect(dialog.getByText("I’ll save it right after you sign in.", { exact: false })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  await expect(dialog.getByLabel("Email")).toBeVisible();
+  // Nothing went to the server; the message waits for sign-in.
+  expect(await page.evaluate(() => window.__requests.filter((r) => String(r.url).includes("/api/")).length)).toBe(0);
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("udhaar.pendingTurn") ?? "null")?.body)).toEqual({ text: "Ramesh ko 340 ka udhaar" });
+  await dialog.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(dialog.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Forgot password?" })).toBeVisible();
+});
+
+test("guest: Udhaar diya and Add customer ask for an account instead of failing", async ({ page }) => {
+  await page.goto("/tests/harness/workspace.html?guest#/workspace/home");
+  await page.getByLabel("Total balance").getByRole("button", { name: /Udhaar diya/ }).click();
+  await expect(page.getByRole("dialog").getByText("save this entry", { exact: false })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Customers" }).click();
+  await page.getByRole("button", { name: "Add customer" }).first().click();
+  await expect(page.getByRole("dialog").getByText("save your customers", { exact: false })).toBeVisible();
+});
+
+test("guest: tapping the mic records right away (sign-up comes when it is sent)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/tests/harness/workspace.html?guest#/workspace/home");
+  await page.getByRole("navigation", { name: "Main navigation (mobile)" }).getByRole("button", { name: "Speak an entry" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Bol rahe hain" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

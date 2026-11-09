@@ -21,8 +21,8 @@ import {
 } from "lucide-react";
 import "./khata.css";
 import { auth, projectId } from "./lib/firebase";
-import { beginGoogleSignIn } from "./lib/google-auth";
-import { GoogleSignInButton } from "./components/GoogleSignInButton";
+import { AuthDialog } from "./components/AuthDialog";
+import { hasPending } from "./lib/pending";
 import { api } from "./lib/api";
 import { money, rupeesToPaise } from "./lib/money";
 import { toCsv } from "./lib/csv";
@@ -41,7 +41,8 @@ import { authErrorMessage } from "./lib/auth-errors";
 
 type Tab = "home" | "customers" | "entries" | "settings" | "advanced";
 type Action = "add_credit" | "add_payment";
-type Dialog = "login" | "customer" | "entry" | "help" | null;
+type Dialog = "customer" | "entry" | "help" | null;
+type AuthAsk = { mode: "login" | "signup"; reason?: string; then?: Dialog };
 
 const NAV = [
   { id: "home" as const, label: "Home", icon: Home },
@@ -85,6 +86,9 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
   const { user, shop, customers, entries, totals, reversals, loading } = workspace;
   const [tab, setTab] = useState<Tab>(tabFromHash);
   const [dialog, setDialog] = useState<Dialog>(null);
+  // Visitors use the app first; an account is asked for only when they try to save something.
+  const [authAsk, setAuthAsk] = useState<AuthAsk | null>(null);
+  const [afterAuth, setAfterAuth] = useState<Dialog>(null);
   const [entryAction, setEntryAction] = useState<Action>("add_credit");
   const [selectedCustomer, setSelectedCustomer] = useState("");
   // Opened "Udhaar diya / Paisa mila" from a customer's page? Go back there afterwards.
@@ -127,6 +131,11 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
     document.title = `${TITLES[tab]} · Udhaar`;
   }, [tab]);
   useEffect(() => {
+    if (!afterAuth || !user || !shop || workspace.needsShop) return;
+    setDialog(afterAuth);
+    setAfterAuth(null);
+  }, [afterAuth, user, shop, workspace.needsShop]);
+  useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 6000);
     return () => clearTimeout(timer);
@@ -143,7 +152,13 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
     setError("");
     setNewName("");
     operation.current = null;
-    setDialog(user || next === "help" ? next : "login");
+    if (user || next === "help") setDialog(next);
+    else
+      setAuthAsk({
+        mode: "signup",
+        reason: next === "customer" ? "Create a free account to save your customers." : "Create a free account to save this entry.",
+        then: next,
+      });
   }
   function openEntry(action: Action, customerId = "", fromDetail = false) {
     setEntryAction(action);
@@ -171,18 +186,6 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
   const customerName = (id: string) =>
     customers.find((c) => c.id === id)?.name || `Customer ${id.slice(0, 8)}`;
 
-  async function submitLogin() {
-    setBusy(true);
-    setError("");
-    try {
-      await beginGoogleSignIn();
-      setDialog(null);
-    } catch (e) {
-      setError(authErrorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  }
   async function saveLanguage(language: string) {
     setBusy(true);
     try {
@@ -309,7 +312,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
     }
   }
   async function testGnani() {
-    if (!user) return open("login");
+    if (!user) return setAuthAsk({ mode: "login" });
     setGnaniCheck("checking");
     try {
       setGnaniCheck(await api<{ ok: boolean; detail: string }>("/api/integrations/gnani/verify", {}));
@@ -318,7 +321,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
     }
   }
   async function checkConnection() {
-    if (!user) return open("login");
+    if (!user) return setAuthAsk({ mode: "login" });
     setConnection("checking");
     setConnectionMessage("");
     try {
@@ -367,6 +370,10 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
   }
 
   const ready = Boolean(user && shop && !workspace.needsShop);
+  const guest = workspace.authReady && !user;
+  const canAct = ready || guest;
+  const askToSave = () =>
+    setAuthAsk({ mode: "signup", reason: "Create a free account to save this. I’ll save it right after you sign in." });
   const due = customers.filter((c) => c.balancePaise > 0).length;
 
   return (
@@ -409,20 +416,20 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
           Speak an entry
         </button>
         <div className="k-side-foot">
-          {user ? <span title={user.email ?? ""}>{user.email}</span> : <button onClick={() => open("login")}>Sign in</button>}
+          {user ? <span title={user.email ?? ""}>{user.email}</span> : <button onClick={() => setAuthAsk({ mode: "login" })}>Log in</button>}
         </div>
       </aside>
 
       <main className="k-main" id="workspace-content" tabIndex={-1}>
         <header className="k-head">
           <h1>{TITLES[tab]}</h1>
-          {tab === "customers" && ready && (
+          {tab === "customers" && canAct && (
             <button className="k-btn k-btn-primary" onClick={() => open("customer")}>
               <Plus size={15} />
               Add customer
             </button>
           )}
-          {tab === "entries" && ready && (
+          {tab === "entries" && ready && entries.length > 0 && (
             <button className="k-btn" disabled={!filteredEntries.length} onClick={exportLedger}>
               <Download size={15} />
               Download CSV
@@ -437,18 +444,20 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
           </div>
         )}
 
+        {guest && (
+          <div className="k-guest" role="note">
+            <span>
+              <strong>You’re trying Udhaar.</strong> Nothing is saved until you sign up — it’s free.
+            </span>
+            <span className="k-guest-actions">
+              <button className="k-link" onClick={() => setAuthAsk({ mode: "login" })}>Log in</button>
+              <button className="k-btn k-btn-primary" onClick={() => setAuthAsk({ mode: "signup" })}>Sign up free</button>
+            </span>
+          </div>
+        )}
+
         {!workspace.authReady || (user && !shop && !workspace.needsShop && !workspace.error) ? (
           <Loading />
-        ) : !user ? (
-          <section className="k-card k-center">
-            <span className="k-logo big">
-              <AudioLines size={22} />
-            </span>
-            <h2>Sign in to open your khata</h2>
-            <p className="k-muted">Only you can see your shop’s records.</p>
-            <GoogleSignInButton busy={busy} onClick={() => void submitLogin()} />
-            {error && <p className="form-error" role="alert">{error}</p>}
-          </section>
         ) : workspace.needsShop ? (
           <section className="k-card">
             <CreateShop
@@ -483,7 +492,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
                 </section>
 
                 <div id="assistant" className="k-assistant">
-                  <Assistant onChanged={workspace.refresh} disabled={!ready} />
+                  <Assistant onChanged={workspace.refresh} disabled={!canAct} onNeedAuth={guest ? askToSave : undefined} />
                 </div>
 
                 {totals.customers === 0 && !loading ? (
@@ -577,7 +586,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
 
             {tab === "settings" && (
               <div className="k-stack">
-                <section className="k-card">
+                {user && <section className="k-card">
                   <h2>Your shop</h2>
                   <dl className="k-dl">
                     <div>
@@ -602,13 +611,15 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
                     </select>
                     <small className="k-muted">English words like “Surf” or “Maggi” always work.</small>
                   </label>
-                </section>
+                </section>}
                 <section className="k-card k-flush">
                   <button className="k-menu-row" onClick={() => open("help")}>
                     <ShieldCheck size={16} />
                     How it works & safety
                     <ChevronRight size={15} />
                   </button>
+                  {user ? (
+                    <>
                   <button className="k-menu-row" onClick={() => navigate("advanced")}>
                     <Settings2 size={16} />
                     Setup & status
@@ -618,11 +629,19 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
                     <LogOut size={16} />
                     Sign out
                   </button>
+                    </>
+                  ) : (
+                    <button className="k-menu-row" onClick={() => setAuthAsk({ mode: "login" })}>
+                      <LogOut size={16} />
+                      Log in or create account
+                      <ChevronRight size={15} />
+                    </button>
+                  )}
                 </section>
               </div>
             )}
 
-            {tab === "advanced" && shop && (
+            {tab === "advanced" && shop && user && (
               <div className="k-stack k-advanced">
                 <button className="k-link" onClick={() => navigate("settings")}>← Settings</button>
                 <section className="k-card">
@@ -637,7 +656,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
                       {connectionMessage}
                     </p>
                   )}
-                  <IntegrationsGrid integrations={integrations && integrations.uid === user.uid ? integrations.list : null} />
+                  <IntegrationsGrid integrations={integrations && integrations.uid === user?.uid ? integrations.list : null} />
                 </section>
                 <section className="k-card">
                   <h2>Gnani voice-to-text</h2>
@@ -676,14 +695,18 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
         ))}
       </nav>
 
-      {dialog === "login" && (
-        <Modal title="Welcome to your khata." eyebrow="OWNER SIGN-IN" close={() => !busy && setDialog(null)}>
-          <div className="form">
-            <p className="modal-description">Continue with Google. New here? You’ll name your shop next.</p>
-            {error && <p className="form-error" role="alert">{error}</p>}
-            <GoogleSignInButton busy={busy} onClick={() => void submitLogin()} />
-          </div>
-        </Modal>
+      {authAsk && (
+        <AuthDialog
+          mode={authAsk.mode}
+          reason={authAsk.reason}
+          onModeChange={(mode) => setAuthAsk({ ...authAsk, mode })}
+          close={() => setAuthAsk(null)}
+          onSignedIn={() => {
+            if (authAsk.then) setAfterAuth(authAsk.then);
+            setAuthAsk(null);
+            setToast(hasPending() ? "Signed in. Saving what you said…" : "Signed in. You’ll stay signed in on this device.");
+          }}
+        />
       )}
       {dialog === "customer" && (
         <Modal title="Add a customer" close={() => !busy && setDialog(null)}>

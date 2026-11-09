@@ -410,3 +410,20 @@ dialog .k-give-get { margin: 4px 0 14px; }
 .assistant-voice-toggle[aria-pressed="true"] { color: var(--k-accent); border-color: #bfe0cf; background: var(--k-accent-soft); }
 .k-contact { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
 .k-contact .k-btn { text-decoration: none; }
+
+/* Guest bar: try first, sign up when saving */
+.k-guest {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid #bfe0cf;
+  border-radius: var(--k-radius);
+  background: var(--k-accent-soft);
+  font-size: 13px;
+}
+.k-guest-actions { display: flex; align-items: center; gap: 12px; }
+.k-guest .k-btn { min-height: 32px; }

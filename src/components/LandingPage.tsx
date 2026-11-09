@@ -70,7 +70,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
             Log in
           </button>
           <button className="l-btn l-btn-primary" onClick={onStart}>
-            Start free
+            Try it free
           </button>
         </div>
       </header>
@@ -86,10 +86,10 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
             </p>
             <div className="l-cta">
               <button className="l-btn l-btn-primary l-btn-lg" onClick={onStart}>
-                Open my khata
+                Try it now
                 <ArrowRight size={16} />
               </button>
-              <span className="l-note">Free · Sign in with Google</span>
+              <span className="l-note">Free · Try it first, sign up when you save</span>
             </div>
             <ul className="l-langs" aria-label="Languages">
               <li>Hinglish</li>

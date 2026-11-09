@@ -1,6 +1,8 @@
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, AudioLines, LoaderCircle, RefreshCw } from "lucide-react";
 import { LandingPage } from "./components/LandingPage";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./lib/firebase";
 import { resolveGoogleRedirectResult } from "./lib/google-auth";
 import { authErrorMessage } from "./lib/auth-errors";
 
@@ -58,6 +60,15 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
+    // Signed in before? Opening the site goes straight to the khata, not the landing page.
+    const stop = onAuthStateChanged(auth, (user) => {
+      stop();
+      const hash = window.location.hash.replace(/^#\/?/, "");
+      if (user && !hash) window.location.hash = "/workspace";
+    });
+    return stop;
+  }, []);
+  useEffect(() => {
     const onHashChange = () => {
       const next = isWorkspace();
       setWorkspace(next);
@@ -96,7 +107,8 @@ export default function App() {
           <Dashboard />
         </Suspense>
       ) : (
-        <LandingPage onStart={() => setAuthMode("signup")} onLogin={() => setAuthMode("login")} />
+        // "Start" opens the product itself; an account is asked for only when the visitor saves something.
+        <LandingPage onStart={() => (window.location.hash = "/workspace")} onLogin={() => setAuthMode("login")} />
       )}
       {authMode && (
         <Suspense

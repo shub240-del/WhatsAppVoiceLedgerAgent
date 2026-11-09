@@ -3,6 +3,7 @@ import { AudioLines, LoaderCircle, Mic, Send, Square, Undo2, Volume2, VolumeX } 
 import { api } from "../lib/api";
 import { blobToBase64, MAX_RECORD_MS, WavRecorder } from "../lib/recorder";
 import { spokenText } from "../lib/speech";
+import { savePending, takePending } from "../lib/pending";
 
 type Turn = {
   turnId: string;
@@ -42,12 +43,22 @@ function speak(reply: string) {
 type Message =
   | { id: string; from: "owner"; text: string; voice: boolean; pending?: boolean }
   | { id: string; from: "bot"; turn: Turn; undone?: boolean }
-  | { id: string; from: "error"; text: string };
+  | { id: string; from: "error"; text: string }
+  | { id: string; from: "note"; text: string };
 
 const EXAMPLES = ["Ramesh ko 340 ka udhaar likh do", "Sunita ne 200 rupaye diye", "Ramesh ka kitna baaki hai?"];
 
 /** In-app voice/text assistant: same rules as the WhatsApp bot (never guesses, asks, undo). */
-export function Assistant({ onChanged, disabled }: { onChanged(): void; disabled?: boolean }) {
+export function Assistant({
+  onChanged,
+  disabled,
+  onNeedAuth,
+}: {
+  onChanged(): void;
+  disabled?: boolean;
+  /** Set for visitors who aren't signed in: their first message is kept and sent after sign-in. */
+  onNeedAuth?(): void;
+}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,6 +82,13 @@ export function Assistant({ onChanged, disabled }: { onChanged(): void; disabled
     if (pendingListen) listen.current();
     return () => window.removeEventListener(LISTEN_EVENT, onListen);
   }, []);
+  // Signed in now (and the khata is ready)? Send what the guest said before signing in.
+  useEffect(() => {
+    if (onNeedAuth || disabled) return;
+    const pending = takePending();
+    if (pending) void send(pending.body, pending.shown, pending.voice);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(onNeedAuth), disabled]);
   function toggleReadAloud() {
     const next = !readAloud;
     setReadAloud(next);
@@ -95,6 +113,18 @@ export function Assistant({ onChanged, disabled }: { onChanged(): void; disabled
   async function send(body: { text?: string; audioBase64?: string; mimeType?: string; replyTo?: string }, shown: string, voice: boolean) {
     const turnId = crypto.randomUUID();
     const ownerId = `o-${turnId}`;
+    if (onNeedAuth) {
+      // Guest: keep exactly what they said, ask them to sign in, and send it right after.
+      const { replyTo: _ignored, ...rest } = body;
+      savePending({ body: rest, shown: voice ? "Voice note" : shown, voice });
+      setMessages((m) => [
+        ...m,
+        { id: ownerId, from: "owner", text: voice ? "Voice note" : shown, voice },
+        { id: `g-${turnId}`, from: "note", text: "Sign in to save this. I’ll save it right after — you won’t need to say it again." },
+      ]);
+      onNeedAuth();
+      return;
+    }
     setMessages((m) => [...m, { id: ownerId, from: "owner", text: shown, voice, pending: true }]);
     setBusy(true);
     try {
@@ -214,6 +244,10 @@ export function Assistant({ onChanged, disabled }: { onChanged(): void; disabled
           ) : m.from === "error" ? (
             <div key={m.id} className="bubble error" role="alert">
               {m.text}
+            </div>
+          ) : m.from === "note" ? (
+            <div key={m.id} className="bubble bot info">
+              <span className="bubble-text">{m.text}</span>
             </div>
           ) : (
             <div key={m.id} className={`bubble bot ${m.turn.kind}`}>

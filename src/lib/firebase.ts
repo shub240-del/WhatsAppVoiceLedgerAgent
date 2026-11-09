@@ -3,9 +3,15 @@ import { connectAuthEmulator, getAuth, signInWithEmailAndPassword } from "fireba
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 
 // Firebase web configuration is public; access is enforced by rules and verified ID tokens.
+// Same-tab Google sign-in: when VITE_AUTH_SAME_SITE=true the auth handler is served from this site
+// (vercel.json proxies /__/auth to Firebase), so the redirect never leaves the app's own domain.
+export const sameSiteAuth =
+  import.meta.env.VITE_AUTH_SAME_SITE === "true" && typeof window !== "undefined" && window.location.protocol === "https:";
 const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD-LNFDk4SWg8Qpuy0YDvv5GooiwBH6PmA",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "udhar-khata-f41fb.firebaseapp.com",
+  authDomain: sameSiteAuth
+    ? window.location.host
+    : import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "udhar-khata-f41fb.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "udhar-khata-f41fb",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:224661631158:web:31071e4838506c10bdf617",
 };

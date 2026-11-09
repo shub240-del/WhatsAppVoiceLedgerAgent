@@ -87,8 +87,8 @@ manual setup.
 The assistant now lives in the website: Home screen → tap the mic (or type). The browser records
 16 kHz mono WAV (≤30 s), `POST /api/assistant` transcribes it with Gnani and runs the same agent
 the WhatsApp bot used (never guesses, asks one question, Undo within 10 minutes). Entries are tagged
-`source: "assistant"`. Needs `GNANI_API_KEY` for voice and `APP_GEMINI_API_KEY` + `APP_GEMINI_MODEL`
-to turn sentences into entries (without Gemini it replies that the AI parser is not configured).
+`source: "assistant"`. Needs `GNANI_API_KEY` for voice and `APP_GEMINI_API_KEY` to turn sentences into entries
+(model defaults to `gemini-3.5-flash-lite`; override with `APP_GEMINI_MODEL`) (without Gemini it replies that the AI parser is not configured).
 
 WhatsApp is switched off but its code is kept: `vercel.json` no longer routes `/webhooks/*`, and the
 queue drain only runs when `WHATSAPP_ENABLED=true`. The `META_*` variables can be deleted from Vercel.

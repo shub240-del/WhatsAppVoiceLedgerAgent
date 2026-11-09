@@ -45,3 +45,15 @@ test("provider outage maps to ProviderUnavailable without leaking details", asyn
   const error = Object.assign(new Error("quota exceeded for key AIza-secret"), { name: "ApiError" });
   await assert.rejects(parser([error]).propose(ctx), (e: unknown) => e instanceof ProviderUnavailable && !String((e as Error).message).includes("AIza"));
 });
+
+test("Gemini setup problems are reported as setup errors, not as 'busy'", async () => {
+  const { GeminiParser } = await import("../../server/agent/gemini");
+  const { ProviderSetupError, ProviderUnavailable } = await import("../../server/agent/errors");
+  const failWith = (status: number) =>
+    new GeminiParser({ apiKey: "local-test", model: "gemini-3.5-flash-lite", generate: async () => { throw Object.assign(new Error("x"), { status }); } });
+  const ctx = { transcript: "Ramesh ko 340", candidates: [], pendingQuestion: null, pendingOptions: [], todayIst: "2026-11-10" };
+  await assert.rejects(failWith(404).propose(ctx), (e: unknown) => e instanceof ProviderSetupError && e.reason === "unknown_model");
+  await assert.rejects(failWith(403).propose(ctx), (e: unknown) => e instanceof ProviderSetupError && e.reason === "invalid_key");
+  await assert.rejects(failWith(429).propose(ctx), (e: unknown) => e instanceof ProviderSetupError && e.reason === "quota");
+  await assert.rejects(failWith(503).propose(ctx), ProviderUnavailable);
+});

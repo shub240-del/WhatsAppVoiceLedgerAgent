@@ -16,7 +16,7 @@ import { ingestWebhook, verifySignature } from "./whatsapp/webhook.js";
 import { log } from "./log.js";
 import { drainQueue, type Runtime } from "./runtime.js";
 import { assistantDeps, runAssistantTurn, type AssistantDeps } from "./assistant.js";
-import { ProviderUnavailable } from "./agent/errors.js";
+import { ProviderSetupError, ProviderUnavailable } from "./agent/errors.js";
 import { GnaniAccountError } from "./gnani-stt.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -179,6 +179,10 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
     if (error instanceof ServiceError) return res.status(error.status).json({ error: { code: error.code, message: error.message } });
     if (error instanceof ProviderUnavailable)
       return res.status(503).json({ error: { code: "PROVIDER_UNAVAILABLE", message: "The voice service is busy right now. Nothing was saved; please try again." } });
+    if (error instanceof ProviderSetupError) {
+      log("warn", "provider_setup_error", { requestId: res.locals.requestId ?? null, provider: error.provider, reason: error.reason });
+      return res.status(503).json({ error: { code: "AI_SETUP", message: `${error.message} Nothing was saved.` } });
+    }
     if (error instanceof GnaniAccountError)
       return res.status(503).json({ error: { code: "VOICE_ACCOUNT", message: "Voice is unavailable (Gnani account problem). Nothing was saved; you can type instead." } });
     if (error instanceof SyntaxError) return res.status(400).json({ error: { code: "INVALID_JSON", message: "Invalid JSON request." } });

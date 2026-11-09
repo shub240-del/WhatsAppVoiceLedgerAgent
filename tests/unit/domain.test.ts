@@ -103,7 +103,7 @@ test("integration classifier reports external providers honestly and never echoe
   const env = { APP_GEMINI_API_KEY: "local-gemini-test-credential", GNANI_API_KEY: "local-gnani-test-credential", PRISMA_API_KEY: "local-prisma-test" };
   const statuses = integrationStatuses(env);
   const state = (p: string) => statuses.find((s) => s.provider === p)?.state;
-  assert.equal(state("gemini"), "INVALID"); // key without model
+  assert.equal(state("gemini"), "CONFIGURED"); // key alone uses the default model
   assert.equal(state("prisma"), "CONFIGURED"); // Gnani Prisma STT via GNANI_API_KEY
   assert.equal(state("timbre"), "NOT_CONFIGURED"); // voice replies not built yet
   assert.equal(state("gnani"), "CONFIGURED");
@@ -126,7 +126,7 @@ test("Gemini requires the application secret and an explicit model, never host o
     assert.throws(() => requireGeminiApiKey(env), /APP_GEMINI_API_KEY is missing/);
     assert.equal(geminiEnvironmentStatus(env).credentialsConfigured, false);
   }
-  assert.equal(geminiConfig({ APP_GEMINI_API_KEY: "k" }).status.state, "INVALID");
+  assert.equal(geminiConfig({ APP_GEMINI_API_KEY: "k" }).config?.model, "gemini-3.5-flash-lite"); // default model
   assert.equal(geminiConfig({ APP_GEMINI_API_KEY: "k", APP_GEMINI_MODEL: "Bad Model!" }).status.state, "INVALID");
   const ok = geminiConfig({ APP_GEMINI_API_KEY: "k", APP_GEMINI_MODEL: "gemini-2.5-flash" });
   assert.equal(ok.status.state, "CONFIGURED");

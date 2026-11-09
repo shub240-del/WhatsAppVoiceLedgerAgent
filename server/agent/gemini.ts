@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { proposalJsonSchema, proposalSchema, type Proposal } from "./schema.js";
-import { InvalidModelOutput, ProviderUnavailable } from "./errors.js";
+import { InvalidModelOutput, ProviderSetupError, ProviderUnavailable } from "./errors.js";
 
 export type ParserContext = {
   transcript: string;
@@ -57,7 +57,11 @@ export class GeminiParser implements EvonParser {
         });
         text = response.text;
       } catch (error) {
-        // Network, quota, timeout or 5xx: nothing has been written; the job may retry.
+        // Setup problems are reported as such (never the key); network, timeout or 5xx may retry.
+        const status = Number((error as { status?: unknown })?.status ?? (error as { code?: unknown })?.code);
+        if (status === 404) throw new ProviderSetupError("gemini", "unknown_model", `Gemini model "${this.options.model}" is not available for this key. Set APP_GEMINI_MODEL to a model listed in Google AI Studio.`);
+        if (status === 400 || status === 401 || status === 403) throw new ProviderSetupError("gemini", "invalid_key", "Gemini rejected the API key or request. Check APP_GEMINI_API_KEY.");
+        if (status === 429) throw new ProviderSetupError("gemini", "quota", "Gemini free-tier limit reached. Wait a minute and try again (or enable billing for higher limits).");
         throw new ProviderUnavailable("gemini", error instanceof Error ? error.name : "UnknownError");
       }
       let parsed: unknown;

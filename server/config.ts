@@ -11,6 +11,7 @@ export type WhatsAppConfig = {
   appSecret: string; verifyToken: string; graphVersion: string;
 };
 export type GeminiConfig = { apiKey: string; model: string };
+export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 const get = (env: Env, key: string) => env[key]?.trim() || "";
 const WHATSAPP_KEYS = ["META_ACCESS_TOKEN", "META_PHONE_NUMBER_ID", "META_BUSINESS_ACCOUNT_ID", "META_APP_SECRET", "META_VERIFY_TOKEN", "META_GRAPH_API_VERSION"] as const;
@@ -40,10 +41,10 @@ export function whatsappConfig(env: Env = process.env): { config: WhatsAppConfig
 export function geminiConfig(env: Env = process.env): { config: GeminiConfig | null; status: IntegrationStatus } {
   const base = { provider: "gemini", role: "EVON LLM parser" };
   const key = geminiEnvironmentStatus(env).credentialsConfigured;
-  const model = get(env, "APP_GEMINI_MODEL");
-  if (!key && !model) return { config: null, status: { ...base, state: "NOT_CONFIGURED", detail: "APP_GEMINI_API_KEY and APP_GEMINI_MODEL not set." } };
-  if (!key) return { config: null, status: { ...base, state: "INVALID", detail: "APP_GEMINI_API_KEY missing." } };
-  if (!model) return { config: null, status: { ...base, state: "INVALID", detail: "APP_GEMINI_MODEL missing; choose the exact model ID enabled for your key." } };
+  // Default: a current stable, fast, low-cost model (ai.google.dev/gemini-api/docs/models).
+  // Short sentence -> one JSON action does not need a larger model. Override with APP_GEMINI_MODEL.
+  const model = get(env, "APP_GEMINI_MODEL") || DEFAULT_GEMINI_MODEL;
+  if (!key) return { config: null, status: { ...base, state: "NOT_CONFIGURED", detail: "APP_GEMINI_API_KEY not set." } };
   if (!/^[a-z0-9][a-z0-9.\-]{2,80}$/.test(model)) return { config: null, status: { ...base, state: "INVALID", detail: "APP_GEMINI_MODEL has an invalid format." } };
   return {
     config: { apiKey: get(env, "APP_GEMINI_API_KEY"), model },

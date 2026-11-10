@@ -7,7 +7,7 @@ Build the narrated walkthrough from the owner's own recordings (no AI voice, no 
 
 Per scene: gentle clean-up that keeps the voice as it is —
   low-cut 70 Hz; hum notches only for tones proven present in the silence before/after speaking;
-  light noise reduction only when room noise is audible; light compression; trim only the dead air at
+  room noise learned from each take's own silences and removed (90%); light compression; trim only the dead air at
   the start and end (pauses inside are kept); the same loudness for every scene; peak limit.
   An identity guard compares the processed take with the raw one and falls back to lighter processing
   if the tone changed by more than 1.5 dB.
@@ -17,6 +17,7 @@ held. Refuses to build if any scene is missing.
 import json, re, subprocess, sys, wave
 from pathlib import Path
 import numpy as np
+import noisereduce
 
 RATE = 48_000
 TARGET_LUFS = -18.0     # each scene; the final mix is normalised to -16 LUFS
@@ -25,6 +26,7 @@ PAD_IN, PAD_OUT = 0.15, 0.25   # dead air kept before / after speech
 TAIL = 0.35                    # quiet beat before the next scene can start
 IDENTITY_LIMIT_DB = 1.5
 FPS = 30
+NOISE_REMOVAL = 0.9   # share of the measured room noise removed
 
 
 def sh(args):
@@ -128,20 +130,34 @@ def lufs(path):
     return (float(i) if i != "-inf" else -70.0), (float(p) if p != "-inf" else -120.0)
 
 
+def room_noise(x, span):
+    a, b = span
+    return np.r_[x[: int(max(0, a - 0.05) * RATE)], x[int((b + 0.1) * RATE):]]
+
+
+def silence_db(x, span):
+    db, _ = frames_db(room_noise(x, span))
+    return float(np.percentile(db, 50))
+
+
 def process_scene(raw_path, out_path, work):
     x = read_pcm(raw_path)
     span, noise = speech_span(x)
     if span is None:
         raise RuntimeError(f"{raw_path.name}: no speech found")
     hums = hums_in_silence(x, span)
+    noise_before = silence_db(x, span)
+    # Learn this take's own room noise from the silence around the words and subtract it.
+    clean = noisereduce.reduce_noise(y=x, sr=RATE, y_noise=room_noise(x, span), stationary=True,
+                                     prop_decrease=NOISE_REMOVAL, n_std_thresh_stationary=1.5).astype(np.float32)
+    denoised = work / f"{raw_path.stem}.denoised.wav"
+    write_wav(denoised, clean)
     start = max(0.0, span[0] - PAD_IN)
     end = min(len(x) / RATE, span[1] + PAD_OUT)
 
     def chain(light):
         f = ["highpass=f=70"]
         f += [f"bandreject=f={h}:width_type=q:w=30" for h in hums]
-        if not light and noise > -62:
-            f.append(f"afftdn=nr={min(10, max(4, (noise + 62) / 2)):.1f}:nf={max(-80, min(-20, noise)):.0f}")
         if not light:
             f.append("acompressor=threshold=-24dB:ratio=2:attack=10:release=150:makeup=1")
         f += [f"atrim=start={start:.3f}:end={end:.3f}", "asetpts=PTS-STARTPTS", "afade=t=in:d=0.02"]
@@ -151,7 +167,8 @@ def process_scene(raw_path, out_path, work):
     ref = tone_shape(raw_trim, hums)
     for light in (False, True):
         tmp = work / f"{out_path.stem}.stage.wav"
-        sh(["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw_path), "-ac", "1", "-ar", str(RATE), "-af", chain(light), str(tmp)])
+        src = raw_path if light else denoised
+        sh(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-ac", "1", "-ar", str(RATE), "-af", chain(light), str(tmp)])
         y = read_pcm(tmp)
         n = int(0.06 * RATE)
         if len(y) > n:
@@ -174,7 +191,9 @@ def process_scene(raw_path, out_path, work):
         "words_kept": bool(abs(len(y2) / RATE - (end - start)) < 0.05),
         "room_noise_dbfs": round(noise, 1),
         "hum_removed_hz": hums,
-        "noise_reduction": (noise > -62) and not light,
+        "noise_reduction": not light,
+        "silence_db_before": round(noise_before, 1),
+        "silence_db_after": round(silence_db(clean, span), 1) if not light else round(noise_before, 1),
         "lighter_processing_used": light,
         "tone_change_db": round(change, 2),
         "lufs": i2,

@@ -117,3 +117,37 @@ test("guest: tapping the mic records right away (sign-up comes when it is sent)"
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test("voice studio: a real voice note is trimmed, cloned once, and every script line is placed on its scene", async ({ page }) => {
+  // The owner's own sample lives outside the repo; skip if it isn't on this machine.
+  const sample = process.env.VOICE_SAMPLE ?? "/tmp/voice-sample.mp3";
+  test.skip(!(await import("node:fs")).existsSync(sample), "no local voice sample");
+  await page.goto("/tests/harness/workspace.html?story#/workspace/studio");
+  await expect(page.getByRole("heading", { name: "Narrate the demo video in your voice" })).toBeVisible();
+  const make = page.getByRole("button", { name: "Make my narration" });
+  await page.getByLabel("Your voice sample").setInputFiles(sample);
+  await expect(make).toBeDisabled(); // consent first
+  await page.getByLabel("This is my own voice", { exact: false }).check();
+  await make.click();
+  const download = page.getByRole("link", { name: "Download narration (WAV)" });
+  await expect(download).toBeVisible({ timeout: 30_000 });
+
+  const calls = await page.evaluate(() => window.__requests.filter((r) => String(r.url).includes("voice-studio")));
+  expect(calls.filter((c) => String(c.url).endsWith("/voice"))).toHaveLength(1);
+  expect(calls.filter((c) => String(c.url).endsWith("/speak"))).toHaveLength(16);
+  const voiceCall = calls.find((c) => String(c.url).endsWith("/voice"))!.body as { mimeType: string; consent: boolean; audioBase64: string };
+  expect(voiceCall.mimeType).toBe("audio/wav");
+  expect(voiceCall.consent).toBe(true);
+  // 25 s of 16 kHz mono WAV ≈ 800 KB ≈ 1.07 M base64 chars: the sample was trimmed, not sent whole.
+  expect(Number(voiceCall.audioBase64.split(" ")[0])).toBeLessThan(1_100_000);
+
+  // The narration covers the whole video and is a valid 24 kHz WAV.
+  const info = await download.evaluate(async (a: HTMLAnchorElement) => {
+    const bytes = await (await fetch(a.href)).arrayBuffer();
+    const v = new DataView(bytes);
+    return { rate: v.getUint32(24, true), seconds: (bytes.byteLength - 44) / 2 / v.getUint32(24, true) };
+  });
+  expect(info.rate).toBe(24000);
+  expect(info.seconds).toBeGreaterThan(85);
+  await expect(page.getByText("Every line lands on its scene.", { exact: false })).toBeVisible();
+});

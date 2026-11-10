@@ -35,11 +35,12 @@ import { CreateShop } from "./components/CreateShop";
 import { EntryForm } from "./components/EntryForm";
 import { Assistant, requestListen } from "./components/Assistant";
 import { ParserEval } from "./components/ParserEval";
+import { VoiceStudio } from "./components/VoiceStudio";
 import { displayPhone, toE164 } from "./lib/phone";
 import { balanceWords } from "./lib/reminder";
 import { authErrorMessage } from "./lib/auth-errors";
 
-type Tab = "home" | "customers" | "entries" | "settings" | "advanced";
+type Tab = "home" | "customers" | "entries" | "settings" | "advanced" | "studio";
 type Action = "add_credit" | "add_payment";
 type Dialog = "customer" | "entry" | "help" | null;
 type AuthAsk = { mode: "login" | "signup"; reason?: string; then?: Dialog };
@@ -56,6 +57,7 @@ const TITLES: Record<Tab, string> = {
   entries: "Entries",
   settings: "Settings",
   advanced: "Setup & status",
+  studio: "Voice studio",
 };
 // Old links (#/workspace/overview, /ledger, /connections…) keep working.
 const LEGACY: Record<string, Tab> = {
@@ -402,7 +404,7 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
           {NAV.map((item) => (
             <button
               key={item.id}
-              className={tab === item.id || (item.id === "settings" && tab === "advanced") ? "active" : ""}
+              className={tab === item.id || (item.id === "settings" && (tab === "advanced" || tab === "studio")) ? "active" : ""}
               aria-current={tab === item.id ? "page" : undefined}
               onClick={() => navigate(item.id)}
             >
@@ -641,6 +643,13 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
               </div>
             )}
 
+            {tab === "studio" && shop && user && (
+              <div className="k-stack">
+                <button className="k-link" onClick={() => navigate("advanced")}>← Setup & status</button>
+                <VoiceStudio />
+              </div>
+            )}
+
             {tab === "advanced" && shop && user && (
               <div className="k-stack k-advanced">
                 <button className="k-link" onClick={() => navigate("settings")}>← Settings</button>
@@ -668,6 +677,16 @@ export default function Dashboard({ useData = useWorkspace }: { useData?: typeof
                   {gnaniCheck && gnaniCheck !== "checking" && (
                     <p role="status" className={gnaniCheck.ok ? "form-success" : "form-error"}>{gnaniCheck.detail}</p>
                   )}
+                </section>
+                <section className="k-card k-row-card">
+                  <div>
+                    <h2>Voice studio</h2>
+                    <p className="k-muted">Narrate the demo video in your own voice, made with Gnani voice cloning.</p>
+                  </div>
+                  <button className="k-btn" onClick={() => navigate("studio")}>
+                    <Mic size={15} />
+                    Open voice studio
+                  </button>
                 </section>
                 <ParserEval />
                 <ActivityPanel shopId={shop.id} customerName={customerName} />

@@ -215,3 +215,16 @@ test("AI accuracy endpoint without a Gemini key explains the problem instead of 
   assert.equal(r.status, 200);
   assert.match(r.json.problem, /APP_GEMINI_API_KEY/);
 });
+
+test("voice studio: owners only, explicit consent required, clear error when Gnani isn't configured", async () => {
+  const sample = { audioBase64: "A".repeat(4000), mimeType: "audio/wav", consent: true };
+  assert.equal((await call("/api/voice-studio/voice", { uid: "studio-stranger", body: sample })).status, 403); // valid input, not an owner
+  await shop("studio-owner");
+  const noConsent = await call("/api/voice-studio/voice", { uid: "studio-owner", body: { ...sample, consent: false } });
+  assert.equal(noConsent.status, 400);
+  const notSetUp = await call("/api/voice-studio/voice", { uid: "studio-owner", body: sample });
+  assert.equal(notSetUp.status, 503);
+  assert.equal(notSetUp.json.error.code, "VOICE_NOT_CONFIGURED");
+  const tooLong = await call("/api/voice-studio/speak", { uid: "studio-owner", body: { text: "x".repeat(601), voice: { embedding: "QUJDREVGR0hJSktMTU5PUA==", shape: [1, 768], dtype: "torch.bfloat16" } } });
+  assert.equal(tooLong.status, 400);
+});

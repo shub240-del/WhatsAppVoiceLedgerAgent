@@ -11,9 +11,29 @@ const params = new URLSearchParams(location.search);
 const guest = params.has("guest");
 const empty = params.has("empty") || params.has("new") || guest;
 window.__requests = [];
+const nativeFetch = window.fetch.bind(window);
 Object.defineProperty(auth, "currentUser", { get: () => ({ getIdToken: async () => "test-token" }) });
+// A short tone as fake "speech" for the voice studio (1.2 s, 24 kHz mono WAV).
+function toneWav(seconds = 1.2, rate = 24000) {
+  const n = Math.round(seconds * rate);
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const w = (o: number, t: string) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.sin((i / rate) * 2 * Math.PI * 220) * 8000, true);
+  return buf;
+}
 window.fetch = (async (url: string, init: RequestInit) => {
-  window.__requests.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : null });
+  const href = String(url);
+  // Only same-origin API calls are faked; real assets (video, fonts) load normally.
+  if (!href.includes("/api/")) return nativeFetch(url, init);
+  const body = init?.body && typeof init.body === "string" ? JSON.parse(init.body) : null;
+  window.__requests.push({ url: href, body: href.includes("voice-studio/voice") ? { ...body, audioBase64: `${body.audioBase64.length} chars` } : body });
+  if (href.endsWith("/api/voice-studio/voice"))
+    return new Response(JSON.stringify({ voice: { embedding: "QUJDREVGR0hJSktMTU5PUA==", shape: [1, 768], dtype: "torch.bfloat16" } }), { status: 200, headers: { "Content-Type": "application/json" } });
+  if (href.endsWith("/api/voice-studio/speak")) return new Response(toneWav(), { status: 200, headers: { "Content-Type": "audio/wav" } });
   return new Response(JSON.stringify({ shopId: "s1", created: true }), { status: 201, headers: { "Content-Type": "application/json" } });
 }) as typeof fetch;
 // ?story: the same shop as the WhatsApp demo after its three entries (used for the walkthrough video).

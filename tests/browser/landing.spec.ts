@@ -147,7 +147,7 @@ test("the walkthrough video is on the page and actually loads", async ({ page })
   await page.goto("/#watch");
   const video = page.getByLabel("Udhaar walkthrough video, 85 seconds, no sound");
   await expect(video).toBeVisible();
-  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState >= 1 && Math.round(v.duration))).toBe(85);
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => (v.readyState >= 1 ? Math.floor(v.duration) : 0))).toBe(85);
   const poster = await page.request.get("/video/udhaar-walkthrough-poster.jpg");
   expect(poster.ok()).toBe(true);
 });

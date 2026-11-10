@@ -20,6 +20,7 @@ import { drainQueue, type Runtime } from "./runtime.js";
 import { assistantDeps, runAssistantTurn, type AssistantDeps } from "./assistant.js";
 import { ProviderSetupError, ProviderUnavailable } from "./agent/errors.js";
 import { GnaniAccountError } from "./gnani-stt.js";
+import { cloneVoice, speakInVoice, speakerEmbedding } from "./gnani-voice.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
 const safeEqual = (a: string, b: string) => {
@@ -98,6 +99,7 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
   app.use(cors({ origin: allowedOrigin, methods: ["GET", "POST", "PATCH", "PUT"], allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "X-Request-Id"], exposedHeaders: ["X-Request-Id"] }));
   // Voice clips (≤30 s WAV, base64) need a larger body than the rest of the API.
   app.use("/api/assistant", express.json({ limit: "2mb" }));
+  app.use("/api/voice-studio/voice", express.json({ limit: "3mb" }));
   app.use(express.json({ limit: "16kb" }));
   const ledger = new LedgerService(store);
   const onboarding = new OnboardingService(store);
@@ -172,6 +174,32 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
     if (!config) return res.json({ ok: false, reason: "not_configured", detail: problems.join(" ") });
     res.json(await verifyGnaniKey(config));
   }));
+  // Voice studio (owner only): clone the owner's own voice from a sample, then narrate lines in it.
+  // Used to voice the demo video. The sample is sent to Gnani and not stored by Udhaar.
+  const voiceSample = z
+    .object({ audioBase64: z.string().min(1000).max(3_000_000), mimeType: z.enum(["audio/wav", "audio/mpeg"]), consent: z.literal(true) })
+    .strict();
+  const voiceLine = z.object({ text: z.string().trim().min(1).max(600), voice: speakerEmbedding }).strict();
+  const studioConfig = async (uid: string) => {
+    const owner = await store.doc(`owners/${uid}`).get();
+    ensure(owner.exists && owner.get("active") === true, 403, "OWNER_REQUIRED", "Create your shop first.");
+    const { config, problems } = gnaniSttConfig(env);
+    ensure(config, 503, "VOICE_NOT_CONFIGURED", `Gnani is not set up on the server: ${problems.join(" ")}`);
+    return config!;
+  };
+  app.post("/api/voice-studio/voice", route(async (req, res) => {
+    const input = voiceSample.parse(req.body);
+    const config = await studioConfig(res.locals.uid);
+    res.json({ voice: await cloneVoice(config, new Uint8Array(Buffer.from(input.audioBase64, "base64")), input.mimeType) });
+  }));
+  app.post("/api/voice-studio/speak", route(async (req, res) => {
+    const input = voiceLine.parse(req.body);
+    const config = await studioConfig(res.locals.uid);
+    const audio = await speakInVoice(config, input.text, input.voice);
+    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Cache-Control", "no-store");
+    res.send(Buffer.from(audio));
+  }));
   // Live AI accuracy test (spec section 9): runs the 16 fixed cases through Gemini + server validation.
   // Batches of 4 keep each request well under the 60 s function limit and the free-tier rate limit.
   app.post("/api/integrations/gemini/eval", route(async (req, res) => {
@@ -201,7 +229,7 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
       return res.status(503).json({ error: { code: "AI_SETUP", message: `${error.message} Nothing was saved.` } });
     }
     if (error instanceof GnaniAccountError)
-      return res.status(503).json({ error: { code: "VOICE_ACCOUNT", message: "Voice is unavailable (Gnani account problem). Nothing was saved; you can type instead." } });
+      return res.status(503).json({ error: { code: "VOICE_ACCOUNT", message: `Voice is unavailable (Gnani account problem: ${error.message}) Nothing was saved; you can type instead.` } });
     // body-parser limits (16 kB API, 2 MB assistant audio) must not surface as a 500.
     const status = (error as { status?: unknown; type?: unknown })?.status;
     if (status === 413 || (error as { type?: unknown })?.type === "entity.too.large")

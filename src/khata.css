@@ -427,3 +427,19 @@ dialog .k-give-get { margin: 4px 0 14px; }
 }
 .k-guest-actions { display: flex; align-items: center; gap: 12px; }
 .k-guest .k-btn { min-height: 32px; }
+
+/* Voice studio */
+.k-check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; }
+.k-check input { margin-top: 3px; accent-color: var(--k-accent); width: 16px; height: 16px; flex: none; }
+.k-field input[type="file"] { height: auto; padding: 8px; }
+.k-script { margin: 0; padding: 0; list-style: none; }
+.k-script li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 14px; padding: 12px 18px; border-top: 1px solid var(--k-line); }
+.k-script-time { display: grid; font-weight: 600; font-variant-numeric: tabular-nums; }
+.k-script-time small { color: var(--k-muted); font-weight: 400; font-size: 12px; }
+.k-script textarea { width: 100%; min-height: 56px; padding: 8px 10px; border: 1px solid var(--k-line); border-radius: 8px; font: inherit; font-size: 15px; line-height: 1.5; resize: vertical; color: var(--k-text); background: var(--k-surface); }
+.k-script textarea:focus { outline: none; border-color: var(--k-accent); box-shadow: 0 0 0 3px var(--k-accent-soft); }
+.k-script-late { grid-column: 2; color: #9a5b00; font-size: 12px; }
+.k-studio-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.k-studio-actions a { text-decoration: none; }
+.k-studio-video { width: 100%; border-radius: 10px; background: #000; }
+@media (max-width: 760px) { .k-script li { grid-template-columns: minmax(0, 1fr); } .k-script-late { grid-column: 1; } }

@@ -144,3 +144,6 @@
 *.stl                filter=lfs diff=lfs merge=lfs -text
 *.nc                 filter=lfs diff=lfs merge=lfs -text
 *.mat                filter=lfs diff=lfs merge=lfs -text
+
+# The landing-page walkthrough video is small and must be served by Vercel as a normal file, not via LFS.
+public/video/* -filter -diff -merge -text

@@ -345,6 +345,7 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
         <div className="l-wrap l-header-inner">
           <SiteLogo />
           <nav className="l-nav" aria-label="Website navigation">
+            <a href="#watch">Watch</a>
             <a href="#how">How it works</a>
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
@@ -405,6 +406,30 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
             </p>
           </div>
           <p className="l-problem-answer">Udhaar fixes this with your voice. No typing, no diary, no app to install.</p>
+        </section>
+
+        <section className="l-section l-wrap l-watch" id="watch" aria-labelledby="watch-title">
+          <div className="l-section-head">
+            <h2 id="watch-title">See the whole thing work</h2>
+            <p>
+              A shopkeeper speaks three entries on WhatsApp, the khata updates, and on Sunday every customer gets a voice
+              note in their own language with a UPI link.
+            </p>
+          </div>
+          <video
+            className="l-video"
+            controls
+            playsInline
+            preload="metadata"
+            poster="/video/udhaar-walkthrough-poster.jpg"
+            aria-label="Udhaar walkthrough video, 85 seconds, no sound"
+          >
+            <source src="/video/udhaar-walkthrough.mp4" type="video/mp4" />
+          </video>
+          <p className="l-video-note">
+            85 seconds, captioned, no sound.{" "}
+            <a href="#/demo">Try the WhatsApp demo yourself</a>
+          </p>
         </section>
 
         <div className="l-wrap">

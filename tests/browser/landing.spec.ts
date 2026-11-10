@@ -10,9 +10,9 @@ test("landing tells the story in order and the demo plays without sign-up", asyn
   const headings = await page.getByRole("heading", { level: 2 }).allInnerTexts();
   expect(headings.slice(0, 4)).toEqual([
     "Rush ke time diary kaun likhe?",
+    "See the whole thing work",
     "Bolo, aur khata mein likh jaata hai",
     "How it works",
-    "Everything a khata needs. Nothing it doesn’t.",
   ]);
   await page.locator("#khata-demo").scrollIntoViewIfNeeded();
   const chat = page.getByLabel("Example conversation");
@@ -30,7 +30,7 @@ test("FAQ answers open, and every CTA leads somewhere real", async ({ page }) =>
   await page.goto("/");
   await page.getByText("Will my customers get messages from Udhaar?").click();
   await expect(page.getByText("Udhaar never messages your customers.", { exact: false })).toBeVisible();
-  for (const name of ["How it works", "Features", "Pricing", "FAQ"]) {
+  for (const name of ["Watch", "How it works", "Features", "Pricing", "FAQ"]) {
     await page.getByRole("navigation", { name: "Website navigation" }).getByRole("link", { name, exact: true }).click();
   }
   await expect(page.locator("#faq")).toBeInViewport();
@@ -69,7 +69,11 @@ test("landing has no horizontal overflow on any screen size", async ({ page }) =
 
 test("public page has local assets, a keyboard skip link and desktop/mobile screenshots", async ({ page }) => {
   const failures: string[] = [];
-  page.on("requestfailed", (request) => failures.push(request.url()));
+  page.on("requestfailed", (request) => {
+    // Leaving the page cancels the video's metadata preload; that is not a broken asset.
+    if (request.resourceType() === "media" && request.failure()?.errorText.includes("ABORTED")) return;
+    failures.push(request.url());
+  });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
   await page.evaluate(() => document.fonts.ready);
@@ -137,4 +141,13 @@ test("Demo has no horizontal overflow on phones", async ({ page }) => {
     await expect(page.getByLabel("Type a message")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
+});
+
+test("the walkthrough video is on the page and actually loads", async ({ page }) => {
+  await page.goto("/#watch");
+  const video = page.getByLabel("Udhaar walkthrough video, 85 seconds, no sound");
+  await expect(video).toBeVisible();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState >= 1 && Math.round(v.duration))).toBe(85);
+  const poster = await page.request.get("/video/udhaar-walkthrough-poster.jpg");
+  expect(poster.ok()).toBe(true);
 });

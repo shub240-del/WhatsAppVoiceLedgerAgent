@@ -341,3 +341,16 @@
   .l-khata { padding-left: 56px; }
 }
 .l-page [id] { scroll-margin-top: 76px; }
+
+/* Walkthrough video */
+.l-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 14px;
+  background: #000;
+  box-shadow: 0 40px 100px -40px rgb(0 0 0 / 0.9);
+}
+.l-video-note { margin-top: 12px !important; color: var(--l-muted) !important; font-size: 15px; }
+.l-video-note a { color: var(--l-text); text-underline-offset: 3px; }

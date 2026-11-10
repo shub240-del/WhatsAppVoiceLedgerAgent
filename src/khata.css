@@ -443,3 +443,5 @@ dialog .k-give-get { margin: 4px 0 14px; }
 .k-studio-actions a { text-decoration: none; }
 .k-studio-video { width: 100%; border-radius: 10px; background: #000; }
 @media (max-width: 760px) { .k-script li { grid-template-columns: minmax(0, 1fr); } .k-script-late { grid-column: 1; } }
+.k-studio-test { display: grid; gap: 8px; }
+.k-studio-test audio { width: 100%; }

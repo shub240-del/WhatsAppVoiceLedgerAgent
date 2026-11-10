@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, LoaderCircle, Mic, Play, RefreshCw } from "lucide-react";
+import { Download, FileArchive, LoaderCircle, Mic, Play, RefreshCw } from "lucide-react";
 import { auth } from "../lib/firebase";
 import { api } from "../lib/api";
 import { blobToBase64, encodeWav } from "../lib/recorder";
+import { makeZip } from "../lib/zip";
 
 /**
  * Voice studio: narrate the walkthrough video in the owner's own voice.
@@ -15,22 +16,22 @@ const RATE = 24_000;
 
 // Start times are when each caption appears in the recorded video (measured while filming).
 export const NARRATION: { at: number; scene: string; text: string }[] = [
-  { at: 0, scene: "Title", text: "हर किराना दुकान में उधार की एक डायरी होती है।" },
-  { at: 3.9, scene: "Website", text: "इसलिए हमने बनाया उधार — एक वॉइस खाता।" },
-  { at: 7.3, scene: "Khata page", text: "आप बोलते हैं, और ये ग्राहक के खाते में लिख देता है। ना डायरी, ना टाइपिंग।" },
-  { at: 16.8, scene: "1 · Voice note", text: "दुकानदार व्हाट्सऐप पर वॉइस नोट भेजता है — रमेश ने दो किलो चावल और एक सर्फ़ लिया, उधार में।" },
-  { at: 23.8, scene: "It asks", text: "दाम बोला ही नहीं गया, तो उधार अंदाज़ा नहीं लगाता। सीधा पूछता है — कितने रुपये?" },
-  { at: 29.4, scene: "Saved", text: "दो सौ तीस — और एंट्री सेव, नए टोटल के साथ।" },
-  { at: 33.1, scene: "2 · Payment", text: "पेमेंट भी ऐसे ही — सुनीता ने दो सौ दिए।" },
+  { at: 0, scene: "Title", text: "हर किराना दुकान में, उधार की एक डायरी होती है।" },
+  { at: 3.9, scene: "Website", text: "इसीलिए हमने बनाया — उधार। एक वॉइस खाता।" },
+  { at: 7.3, scene: "Khata page", text: "आप बस बोलिए, और ये सीधा ग्राहक के खाते में लिख देता है। ना डायरी, ना टाइपिंग।" },
+  { at: 16.8, scene: "1 · Voice note", text: "देखिए — दुकानदार व्हाट्सऐप पर वॉइस नोट भेजता है: रमेश ने दो किलो चावल और एक सर्फ़ लिया, उधार में।" },
+  { at: 23.8, scene: "It asks", text: "यहाँ दाम बोला ही नहीं गया… तो उधार अंदाज़ा नहीं लगाता, सीधा पूछता है — कितने रुपये?" },
+  { at: 29.4, scene: "Saved", text: "दो सौ तीस बोला, और एंट्री सेव — नए टोटल के साथ।" },
+  { at: 33.1, scene: "2 · Payment", text: "पेमेंट भी बिल्कुल ऐसे ही — सुनीता ने दो सौ दिए।" },
   { at: 38.7, scene: "3 · Udhaar", text: "और एक और उधार, प्रिया के नाम।" },
-  { at: 43.5, scene: "Live khata", text: "खाता तुरंत अपडेट होता है।" },
-  { at: 47.3, scene: "4 · Sunday", text: "अब असली कमाल — हर संडे, सबको रिमाइंडर जाता है।" },
-  { at: 51.6, scene: "Ramesh", text: "रमेश को हिंदी में वॉइस नोट मिलता है — कितना बाकी है, और साथ में यूपीआई लिंक।" },
-  { at: 57.5, scene: "UPI", text: "एक टैप, और यूपीआई ऐप खुल जाता है, अमाउंट पहले से भरा हुआ।" },
-  { at: 61.6, scene: "Sunita", text: "सुनीता को मराठी में," },
-  { at: 65.1, scene: "Priya", text: "और प्रिया को गुजराती में। हर ग्राहक की अपनी भाषा।" },
-  { at: 69.7, scene: "5 · Web khata", text: "और दुकानदार का पूरा खाता वेब पर भी — किसका कितना बाकी है, हर एंट्री, पूरी हिस्ट्री।" },
-  { at: 81.5, scene: "End", text: "उधार। बोलो — और हिसाब हो गया।" },
+  { at: 43.5, scene: "Live khata", text: "और खाता, तुरंत अपडेट।" },
+  { at: 47.3, scene: "4 · Sunday", text: "अब असली कमाल देखिए — हर संडे, रिमाइंडर अपने आप जाता है।" },
+  { at: 51.6, scene: "Ramesh", text: "रमेश को हिंदी में एक वॉइस नोट मिलता है — कितना बाकी है, और साथ में यूपीआई लिंक।" },
+  { at: 57.5, scene: "UPI", text: "बस एक टैप, और यूपीआई ऐप खुल जाता है — अमाउंट पहले से भरा हुआ।" },
+  { at: 61.6, scene: "Sunita", text: "सुनीता को यही मैसेज मराठी में," },
+  { at: 65.1, scene: "Priya", text: "और प्रिया को गुजराती में। हर ग्राहक, अपनी भाषा में।" },
+  { at: 69.7, scene: "5 · Web khata", text: "और दुकानदार का पूरा खाता वेब पर भी है — किसका कितना बाकी है, हर एंट्री, और पूरी हिस्ट्री।" },
+  { at: 81.5, scene: "End", text: "उधार। बस बोलिए — और हिसाब हो गया।" },
 ];
 
 type Voice = { embedding: string; shape: number[]; dtype: string };
@@ -89,6 +90,8 @@ export function VoiceStudio() {
   const [error, setError] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [narration, setNarration] = useState<string | null>(null);
+  const [bundle, setBundle] = useState<string | null>(null);
+  const [testLine, setTestLine] = useState<string | null>(null);
   const voice = useRef<{ file: File; voice: Voice } | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const audio = useRef<HTMLAudioElement>(null);
@@ -97,28 +100,56 @@ export function VoiceStudio() {
     if (narration) URL.revokeObjectURL(narration);
   }, [narration]);
 
+  async function ensureVoice(): Promise<Voice> {
+    if (voice.current?.file === file) return voice.current.voice;
+    setProgress("Preparing your sample…");
+    const sample = await prepareSample(file!);
+    setProgress(`Cloning your voice from ${Math.round(sample.used)} s of the sample…`);
+    const { voice: v } = await api<{ voice: Voice }>("/api/voice-studio/voice", {
+      audioBase64: await blobToBase64(sample.wav),
+      mimeType: "audio/wav",
+      consent: true,
+    });
+    voice.current = { file: file!, voice: v };
+    return v;
+  }
+
+  /** One line first, so the owner can judge the likeness before voicing everything. */
+  async function test() {
+    if (!file || !consent || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const v = await ensureVoice();
+      setProgress("Speaking the first line…");
+      const wav = await speak(texts[0], v);
+      if (testLine) URL.revokeObjectURL(testLine);
+      setTestLine(URL.createObjectURL(new Blob([wav], { type: "audio/wav" })));
+      setProgress("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      setProgress("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function make() {
     if (!file || !consent || busy) return;
     setBusy(true);
     setError("");
     setNarration(null);
+    setBundle(null);
     try {
-      if (voice.current?.file !== file) {
-        setProgress("Preparing your sample…");
-        const sample = await prepareSample(file);
-        setProgress(`Cloning your voice from ${Math.round(sample.used)} s of the sample…`);
-        const { voice: v } = await api<{ voice: Voice }>("/api/voice-studio/voice", {
-          audioBase64: await blobToBase64(sample.wav),
-          mimeType: "audio/wav",
-          consent: true,
-        });
-        voice.current = { file, voice: v };
-      }
+      const v = await ensureVoice();
       const decoder = new AudioContext({ sampleRate: RATE });
+      const raw: ArrayBuffer[] = [];
       const buffers: AudioBuffer[] = [];
       for (let i = 0; i < NARRATION.length; i++) {
         setProgress(`Speaking line ${i + 1} of ${NARRATION.length}…`);
-        buffers.push(await decoder.decodeAudioData(await speak(texts[i], voice.current.voice)));
+        const wav = await speak(texts[i], v);
+        raw.push(wav.slice(0));
+        buffers.push(await decoder.decodeAudioData(wav));
       }
       await decoder.close();
       // Each line starts when its caption appears; if the line before runs long, it waits for it.
@@ -137,8 +168,28 @@ export function VoiceStudio() {
         s.start(placed[i].start);
       });
       const rendered = await mix.startRendering();
+      const full = encodeWav(rendered.getChannelData(0), RATE);
       setLines(placed);
-      setNarration(URL.createObjectURL(encodeWav(rendered.getChannelData(0), RATE)));
+      setNarration(URL.createObjectURL(full));
+      // Everything the video editor needs: each line separately, the full mix, the script and timings.
+      const slug = (scene: string) => scene.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const zip = await makeZip([
+        ...raw.map((r, i) => ({ name: `lines/${String(i + 1).padStart(2, "0")}-${slug(NARRATION[i].scene)}.wav`, data: new Blob([r]) })),
+        { name: "narration.wav", data: full },
+        {
+          name: "script.txt",
+          data: NARRATION.map((n, i) => `${String(i + 1).padStart(2, "0")}  ${n.at.toFixed(1)}s  ${n.scene}\n    ${texts[i]}`).join("\n\n") + "\n",
+        },
+        {
+          name: "timing.json",
+          data: JSON.stringify(
+            NARRATION.map((n, i) => ({ line: i + 1, scene: n.scene, captionAt: n.at, text: texts[i], seconds: +placed[i].seconds.toFixed(3) })),
+            null,
+            1,
+          ),
+        },
+      ]);
+      setBundle(URL.createObjectURL(zip));
       setProgress("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
@@ -217,6 +268,10 @@ export function VoiceStudio() {
 
       <section className="k-card">
         <div className="k-studio-actions">
+          <button className="k-btn" onClick={() => void test()} disabled={!file || !consent || busy}>
+            <Play size={15} />
+            Test my voice (1 line)
+          </button>
           <button className="k-btn k-btn-primary" onClick={() => void make()} disabled={!file || !consent || busy}>
             {busy ? <LoaderCircle size={15} className="spin" /> : narration ? <RefreshCw size={15} /> : <Mic size={15} />}
             {narration ? "Make it again" : "Make my narration"}
@@ -224,6 +279,12 @@ export function VoiceStudio() {
           {progress && <span className="k-muted" role="status">{progress}</span>}
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}
+        {testLine && !narration && (
+          <div className="k-studio-test">
+            <p className="k-muted">Does this sound like you? If yes, make the whole narration. If not, try a cleaner sample.</p>
+            <audio src={testLine} controls aria-label="Test line in your voice" />
+          </div>
+        )}
         {narration && (
           <>
             <p className="k-muted">
@@ -243,16 +304,25 @@ export function VoiceStudio() {
             />
             <audio ref={audio} src={narration} preload="auto" />
             <div className="k-studio-actions">
-              <a className="k-btn k-btn-primary" href={narration} download="udhaar-narration.wav">
+              {bundle && (
+                <a className="k-btn k-btn-primary" href={bundle} download="udhaar-narration.zip">
+                  <FileArchive size={15} />
+                  Download everything (ZIP)
+                </a>
+              )}
+              <a className="k-btn" href={narration} download="udhaar-narration.wav">
                 <Download size={15} />
-                Download narration (WAV)
+                Narration only (WAV)
               </a>
               <button className="k-btn" onClick={() => { if (video.current) { video.current.currentTime = 0; void video.current.play(); } }}>
                 <Play size={15} />
                 Play from the start
               </button>
             </div>
-            <p className="k-muted">Send the downloaded file to Claude to get the final video with your voice.</p>
+            <p className="k-muted">
+              Send the ZIP to Claude: it has each line separately, so the video can be re-timed around your voice
+              instead of speeding your voice up.
+            </p>
           </>
         )}
       </section>

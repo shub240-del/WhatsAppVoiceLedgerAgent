@@ -274,6 +274,9 @@ export function VoiceStudio() {
       <section className="k-card">
         <h2>Narrate the demo video in your voice</h2>
         <p className="k-muted">
+          Prefer your real voice, no AI? <a href="#/narrate">Record the narration yourself, scene by scene</a>.
+        </p>
+        <p className="k-muted">
           Upload a clear recording of yourself talking (5–60 seconds). Gnani makes a copy of your voice and reads the
           script below, timed to the 85-second walkthrough. Udhaar doesn’t store the sample or the voice.
         </p>

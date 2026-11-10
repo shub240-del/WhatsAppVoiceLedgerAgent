@@ -8,11 +8,13 @@ import { authErrorMessage } from "./lib/auth-errors";
 
 const Dashboard = lazy(() => import("./Dashboard"));
 const DemoPage = lazy(() => import("./DemoPage"));
+const NarrationPage = lazy(() => import("./NarrationPage"));
 const AuthDialog = lazy(() =>
   import("./components/AuthDialog").then((module) => ({ default: module.AuthDialog })),
 );
 const isWorkspace = () => window.location.hash.startsWith("#/workspace");
 const isDemo = () => window.location.hash.startsWith("#/demo");
+const isNarrate = () => window.location.hash.startsWith("#/narrate");
 
 class ExperienceBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -45,6 +47,7 @@ class ExperienceBoundary extends Component<{ children: ReactNode }, { failed: bo
 export default function App() {
   const [workspace, setWorkspace] = useState(isWorkspace);
   const [demo, setDemo] = useState(isDemo);
+  const [narrate, setNarrate] = useState(isNarrate);
   const [authMode, setAuthMode] = useState<"login" | "signup" | null>(null);
   const [authRedirectError, setAuthRedirectError] = useState("");
   useEffect(() => {
@@ -76,6 +79,7 @@ export default function App() {
       const next = isWorkspace();
       setWorkspace(next);
       setDemo(isDemo());
+      setNarrate(isNarrate());
       setAuthMode(null);
       if (next) window.scrollTo(0, 0);
     };
@@ -99,7 +103,11 @@ export default function App() {
           </button>
         </div>
       )}
-      {demo ? (
+      {narrate ? (
+        <Suspense fallback={<main className="experience-error"><LoaderCircle className="spin" size={26} /><p>Opening the recorder…</p></main>}>
+          <NarrationPage />
+        </Suspense>
+      ) : demo ? (
         <Suspense
           fallback={
             <main className="experience-error">

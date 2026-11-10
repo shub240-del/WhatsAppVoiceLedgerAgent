@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cloneVoice, speakInVoice } from "../../server/gnani-voice";
-import { GnaniAccountError } from "../../server/gnani-stt";
+import { cloneVoice, GnaniVoiceError, speakInVoice } from "../../server/gnani-voice";
 import { ProviderUnavailable } from "../../server/agent/errors";
 import type { GnaniSttConfig } from "../../server/gnani-config";
 
@@ -36,11 +35,27 @@ test("speaking sends the text with the cloned voice and asks for 24 kHz mono WAV
   assert.equal(body.audio_config.container, "wav");
 });
 
-test("account problems and outages map to clear errors; the key never appears in them", async () => {
-  for (const [status, Expected] of [[401, GnaniAccountError], [402, GnaniAccountError], [403, GnaniAccountError], [500, ProviderUnavailable], [429, ProviderUnavailable]] as const) {
-    const fetchImpl = (async () => new Response("{}", { status })) as unknown as typeof fetch;
-    await assert.rejects(speakInVoice(config, "namaste", voice, fetchImpl), (e: Error) => e instanceof Expected && !e.message.includes("test-key"));
+test("Gnani's exact refusal reaches the owner: status, error code and message; never the key; no fallback voice", async () => {
+  const cases: [number, unknown, RegExp][] = [
+    [403, { detail: { error_code: "SCOPE_NOT_ALLOWED", message: "Voice cloning is not enabled for this key" } }, /HTTP 403 \(SCOPE_NOT_ALLOWED: Voice cloning is not enabled for this key\): this Gnani key isn't allowed to use voice cloning/],
+    [402, { detail: { error_code: "INSUFFICIENT_CREDIT", message: "Top up" } }, /HTTP 402 .*no credit left/],
+    [401, { detail: { error_code: "INVALID_API_KEY", message: "bad key" } }, /HTTP 401 .*rejected the API key/],
+    [400, { success: false, message: "Unknown model vachana-vc-v1", status_code: 400 }, /HTTP 400 \(Unknown model vachana-vc-v1\)/],
+    [429, { detail: { error_code: "RATE_LIMITED", message: "slow down" } }, /HTTP 429 .*rate-limiting/],
+    [500, { success: false, message: "boom" }, /HTTP 500 \(boom\): Gnani had an internal error/],
+  ];
+  for (const [status, body, expected] of cases) {
+    const fetchImpl = (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+    await assert.rejects(speakInVoice(config, "namaste", voice, fetchImpl), (e: Error) => {
+      assert.ok(e instanceof GnaniVoiceError, `status ${status}: ${e.name}`);
+      assert.match(e.message, expected);
+      assert.match(e.message, /no other voice was used/);
+      assert.ok(!e.message.includes("test-key"));
+      return true;
+    });
   }
+  const clone403 = (async () => new Response(JSON.stringify({ detail: { error_code: "SCOPE_NOT_ALLOWED", message: "x" } }), { status: 403 })) as unknown as typeof fetch;
+  await assert.rejects(cloneVoice(config, new Uint8Array(2000), "audio/wav", clone403), /Gnani voice cloning failed — HTTP 403/);
   const odd = (async () => new Response(JSON.stringify({ data: {} }), { status: 200 })) as unknown as typeof fetch;
   await assert.rejects(cloneVoice(config, new Uint8Array(2000), "audio/mpeg", odd), ProviderUnavailable);
 });

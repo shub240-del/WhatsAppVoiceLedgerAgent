@@ -20,7 +20,7 @@ import { drainQueue, type Runtime } from "./runtime.js";
 import { assistantDeps, runAssistantTurn, type AssistantDeps } from "./assistant.js";
 import { ProviderSetupError, ProviderUnavailable } from "./agent/errors.js";
 import { GnaniAccountError } from "./gnani-stt.js";
-import { cloneVoice, speakInVoice, speakerEmbedding } from "./gnani-voice.js";
+import { cloneVoice, GnaniVoiceError, speakInVoice, speakerEmbedding } from "./gnani-voice.js";
 
 type Env = Readonly<Record<string, string | undefined>>;
 const safeEqual = (a: string, b: string) => {
@@ -227,6 +227,10 @@ export function createApi(store: Firestore, adminAuth: Auth, allowedOrigin: stri
     if (error instanceof ProviderSetupError) {
       log("warn", "provider_setup_error", { requestId: res.locals.requestId ?? null, provider: error.provider, reason: error.reason });
       return res.status(503).json({ error: { code: "AI_SETUP", message: `${error.message} Nothing was saved.` } });
+    }
+    if (error instanceof GnaniVoiceError) {
+      log("warn", "gnani_voice_error", { requestId: res.locals.requestId ?? null, step: error.step, status: error.status, code: error.gnaniCode });
+      return res.status(502).json({ error: { code: "GNANI_REJECTED", message: error.message, gnaniStatus: error.status, gnaniCode: error.gnaniCode } });
     }
     if (error instanceof GnaniAccountError)
       return res.status(503).json({ error: { code: "VOICE_ACCOUNT", message: `Voice is unavailable (Gnani account problem: ${error.message}) Nothing was saved; you can type instead.` } });

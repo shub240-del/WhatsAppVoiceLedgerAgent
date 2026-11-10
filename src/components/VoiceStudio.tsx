@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, FileArchive, LoaderCircle, Mic, Play, RefreshCw } from "lucide-react";
+import { Check, Download, FileArchive, LoaderCircle, Mic, Play, RefreshCw, X } from "lucide-react";
 import { auth } from "../lib/firebase";
 import { api } from "../lib/api";
 import { blobToBase64, encodeWav } from "../lib/recorder";
 import { makeZip } from "../lib/zip";
+import { bands, profile, timbreDifference, type VoiceProfile } from "../lib/voice-metrics";
 
 /**
  * Voice studio: narrate the walkthrough video in the owner's own voice.
@@ -63,7 +64,39 @@ async function prepareSample(file: File) {
   source.connect(offline.destination);
   source.start();
   const rendered = await offline.startRendering();
-  return { wav: encodeWav(rendered.getChannelData(0), 16_000), seconds: decoded.duration, used: length / decoded.sampleRate };
+  const pcm = rendered.getChannelData(0);
+  return { wav: encodeWav(pcm, 16_000), pcm: new Float32Array(pcm), seconds: decoded.duration, used: length / decoded.sampleRate };
+}
+
+/** Any WAV/MP3 bytes -> 16 kHz mono samples, for measuring. */
+async function toPcm16k(bytes: ArrayBuffer) {
+  const ctx = new AudioContext();
+  const decoded = await ctx.decodeAudioData(bytes);
+  await ctx.close();
+  const offline = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration * 16_000)), 16_000);
+  const src = offline.createBufferSource();
+  src.buffer = decoded;
+  src.connect(offline.destination);
+  src.start();
+  return new Float32Array((await offline.startRendering()).getChannelData(0));
+}
+
+type Measured = { name: string; p: VoiceProfile };
+
+/** Plain-language comparison of the clone with the recording it was made from. */
+function verdicts(source: VoiceProfile, clone: VoiceProfile) {
+  const pct = (a: number, b: number) => (b ? (Math.abs(a - b) / b) * 100 : 100);
+  const pitchOff = pct(clone.pitchMedian, source.pitchMedian);
+  const rateOff = pct(clone.syllablesPerSecond, source.syllablesPerSecond);
+  const tone = timbreDifference(source.bands, clone.bands);
+  return {
+    pitch: pitchOff <= 10 ? "close" : pitchOff <= 25 ? "somewhat different" : "different",
+    pitchOff,
+    rhythm: rateOff <= 20 ? "close" : rateOff <= 40 ? "somewhat different" : "different",
+    rateOff,
+    tone,
+    toneWord: tone < 3 ? "close" : tone < 6 ? "noticeably different" : "different",
+  };
 }
 
 async function speak(text: string, voice: Voice): Promise<ArrayBuffer> {
@@ -83,6 +116,11 @@ async function speak(text: string, voice: Voice): Promise<ArrayBuffer> {
 
 export function VoiceStudio() {
   const [file, setFile] = useState<File | null>(null);
+  const [cleanFile, setCleanFile] = useState<File | null>(null);
+  const [source, setSource] = useState<"original" | "cleaned">("original");
+  const [measured, setMeasured] = useState<Measured[]>([]);
+  const [approved, setApproved] = useState<boolean | null>(null);
+  const [urls, setUrls] = useState<{ original?: string; cleaned?: string }>({});
   const [consent, setConsent] = useState(false);
   const [texts, setTexts] = useState(NARRATION.map((n) => n.text));
   const [busy, setBusy] = useState(false);
@@ -99,18 +137,31 @@ export function VoiceStudio() {
   useEffect(() => () => {
     if (narration) URL.revokeObjectURL(narration);
   }, [narration]);
+  useEffect(() => {
+    const next = { original: file ? URL.createObjectURL(file) : undefined, cleaned: cleanFile ? URL.createObjectURL(cleanFile) : undefined };
+    setUrls(next);
+    return () => Object.values(next).forEach((u) => u && URL.revokeObjectURL(u));
+  }, [file, cleanFile]);
+  // Anything that changes the voice or the test line needs a fresh test and a fresh approval.
+  useEffect(() => {
+    setApproved(null);
+    setMeasured([]);
+    setTestLine(null);
+  }, [file, cleanFile, source]);
+
+  const sourceFile = source === "cleaned" && cleanFile ? cleanFile : file;
 
   async function ensureVoice(): Promise<Voice> {
-    if (voice.current?.file === file) return voice.current.voice;
+    if (voice.current?.file === sourceFile) return voice.current.voice;
     setProgress("Preparing your sample…");
-    const sample = await prepareSample(file!);
+    const sample = await prepareSample(sourceFile!);
     setProgress(`Cloning your voice from ${Math.round(sample.used)} s of the sample…`);
     const { voice: v } = await api<{ voice: Voice }>("/api/voice-studio/voice", {
       audioBase64: await blobToBase64(sample.wav),
       mimeType: "audio/wav",
       consent: true,
     });
-    voice.current = { file: file!, voice: v };
+    voice.current = { file: sourceFile!, voice: v };
     return v;
   }
 
@@ -119,12 +170,19 @@ export function VoiceStudio() {
     if (!file || !consent || busy) return;
     setBusy(true);
     setError("");
+    setApproved(null);
     try {
       const v = await ensureVoice();
-      setProgress("Speaking the first line…");
+      setProgress("Speaking the first line in your cloned voice…");
       const wav = await speak(texts[0], v);
       if (testLine) URL.revokeObjectURL(testLine);
-      setTestLine(URL.createObjectURL(new Blob([wav], { type: "audio/wav" })));
+      setTestLine(URL.createObjectURL(new Blob([wav.slice(0)], { type: "audio/wav" })));
+      setProgress("Measuring the three recordings…");
+      // Measure the same 25 s that is (or would be) sent to Gnani, so the comparison is fair.
+      const m: Measured[] = [{ name: "Your original", p: profile((await prepareSample(file)).pcm, 16_000) }];
+      if (cleanFile) m.push({ name: "Cleaned", p: profile((await prepareSample(cleanFile)).pcm, 16_000) });
+      m.push({ name: "Cloned voice", p: profile(await toPcm16k(wav), 16_000) });
+      setMeasured(m);
       setProgress("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
@@ -135,7 +193,7 @@ export function VoiceStudio() {
   }
 
   async function make() {
-    if (!file || !consent || busy) return;
+    if (!file || !consent || busy || approved !== true) return;
     setBusy(true);
     setError("");
     setNarration(null);
@@ -224,6 +282,25 @@ export function VoiceStudio() {
           <input type="file" accept="audio/*,video/*" onChange={(e) => setFile(e.currentTarget.files?.[0] ?? null)} disabled={busy} />
           <small className="k-muted">WhatsApp voice notes, MP3, M4A or WAV. A quiet room works best.</small>
         </label>
+        <label className="k-field">
+          Cleaned version <span className="subtle">(optional, for comparison)</span>
+          <input type="file" accept="audio/*" onChange={(e) => setCleanFile(e.currentTarget.files?.[0] ?? null)} disabled={busy} />
+        </label>
+        {cleanFile && (
+          <fieldset className="k-field k-lang">
+            <legend>Clone from</legend>
+            <label className={source === "original" ? "on" : ""}>
+              <input type="radio" name="source" checked={source === "original"} onChange={() => setSource("original")} />
+              <strong>My original</strong>
+              <small>No processing, safest for your natural voice</small>
+            </label>
+            <label className={source === "cleaned" ? "on" : ""}>
+              <input type="radio" name="source" checked={source === "cleaned"} onChange={() => setSource("cleaned")} />
+              <strong>The cleaned version</strong>
+              <small>Only if you hear a hum in the original that isn’t in this one</small>
+            </label>
+          </fieldset>
+        )}
         <label className="k-check">
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.currentTarget.checked)} disabled={busy} />
           This is my own voice, and I want to use a copy of it to narrate this video.
@@ -272,17 +349,66 @@ export function VoiceStudio() {
             <Play size={15} />
             Test my voice (1 line)
           </button>
-          <button className="k-btn k-btn-primary" onClick={() => void make()} disabled={!file || !consent || busy}>
+          <button
+            className="k-btn k-btn-primary"
+            onClick={() => void make()}
+            disabled={!file || !consent || busy || approved !== true}
+            title={approved === true ? "" : "Approve the test line first"}
+          >
             {busy ? <LoaderCircle size={15} className="spin" /> : narration ? <RefreshCw size={15} /> : <Mic size={15} />}
-            {narration ? "Make it again" : "Make my narration"}
+            {narration ? "Make it again" : "Make all 16 lines"}
           </button>
+          {approved !== true && <span className="k-muted">All 16 lines unlock after you approve the test line.</span>}
           {progress && <span className="k-muted" role="status">{progress}</span>}
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}
-        {testLine && !narration && (
-          <div className="k-studio-test">
-            <p className="k-muted">Does this sound like you? If yes, make the whole narration. If not, try a cleaner sample.</p>
-            <audio src={testLine} controls aria-label="Test line in your voice" />
+        {testLine && (
+          <div className="k-compare">
+            <h3>Compare: does the clone sound like you?</h3>
+            <div className="k-players">
+              {urls.original && (
+                <label>
+                  Your original
+                  <audio src={urls.original} controls preload="metadata" />
+                </label>
+              )}
+              {urls.cleaned && (
+                <label>
+                  Cleaned
+                  <audio src={urls.cleaned} controls preload="metadata" />
+                </label>
+              )}
+              <label>
+                Cloned voice — line 1
+                <audio src={testLine} controls preload="auto" aria-label="Test line in your voice" />
+              </label>
+            </div>
+            {measured.length > 1 && <Comparison measured={measured} sourceName={source === "cleaned" && cleanFile ? "Cleaned" : "Your original"} />}
+            <p className="k-muted">
+              The numbers compare averages only. Accent, pronunciation and natural expression can only be judged by
+              listening: play your original, then the clone, a few times each.
+            </p>
+            <div className="k-studio-actions" role="group" aria-label="Your decision">
+              <button className={`k-btn ${approved === true ? "k-btn-primary" : ""}`} aria-pressed={approved === true} onClick={() => setApproved(true)} disabled={busy}>
+                <Check size={15} />
+                Approve — this sounds like me
+              </button>
+              <button className="k-btn" aria-pressed={approved === false} onClick={() => setApproved(false)} disabled={busy}>
+                <X size={15} />
+                No, it doesn’t
+              </button>
+            </div>
+            {approved === false && (
+              <div className="k-studio-tips" role="status">
+                <strong>To get a closer clone:</strong>
+                <ul>
+                  <li>Record 20–30 seconds in a quiet room (fan and TV off), phone about 20 cm away.</li>
+                  <li>Talk naturally, the way you’d explain Udhaar to a friend — not reading.</li>
+                  <li>Use your normal language mix (Hindi/Hinglish), since the script is in Hindi.</li>
+                </ul>
+                Then upload the new recording and test again. Nothing else will be generated.
+              </div>
+            )}
           </div>
         )}
         {narration && (
@@ -326,6 +452,64 @@ export function VoiceStudio() {
           </>
         )}
       </section>
+    </div>
+  );
+}
+
+function Comparison({ measured, sourceName }: { measured: Measured[]; sourceName: string }) {
+  const source = measured.find((m) => m.name === sourceName) ?? measured[0];
+  const clone = measured[measured.length - 1];
+  const v = verdicts(source.p, clone.p);
+  const hz = (n: number) => `${Math.round(n)} Hz`;
+  return (
+    <div className="k-table-wrap" tabIndex={0} role="region" aria-label="Voice comparison">
+      <table className="k-compare-table">
+        <thead>
+          <tr>
+            <th scope="col">Measure</th>
+            {measured.map((m) => (
+              <th key={m.name} scope="col">{m.name}</th>
+            ))}
+            <th scope="col">Clone vs {sourceName.toLowerCase()}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Pitch (median)</th>
+            {measured.map((m) => <td key={m.name}>{hz(m.p.pitchMedian)}</td>)}
+            <td>{v.pitch} ({v.pitchOff.toFixed(0)}% apart)</td>
+          </tr>
+          <tr>
+            <th scope="row">Pitch range (10–90%)</th>
+            {measured.map((m) => <td key={m.name}>{hz(m.p.pitchLow)}–{hz(m.p.pitchHigh)}</td>)}
+            <td>wider range = more natural expression</td>
+          </tr>
+          <tr>
+            <th scope="row">Speaking pace</th>
+            {measured.map((m) => <td key={m.name}>{m.p.syllablesPerSecond.toFixed(1)} syllables/s</td>)}
+            <td>{v.rhythm} ({v.rateOff.toFixed(0)}% apart)</td>
+          </tr>
+          <tr>
+            <th scope="row">Pauses</th>
+            {measured.map((m) => <td key={m.name}>{Math.round(m.p.pauseShare * 100)}%</td>)}
+            <td>a script line has fewer pauses than free talk</td>
+          </tr>
+          <tr>
+            <th scope="row">Brightness</th>
+            {measured.map((m) => <td key={m.name}>{hz(m.p.brightness)}</td>)}
+            <td>higher = thinner / brighter</td>
+          </tr>
+          <tr>
+            <th scope="row">Tone (spectral shape)</th>
+            {measured.map((m) => <td key={m.name}>{m === source ? "reference" : `${timbreDifference(source.p.bands, m.p.bands).toFixed(1)} dB off`}</td>)}
+            <td>{v.toneWord} ({v.tone.toFixed(1)} dB)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="k-muted k-small">
+        Pitch in a recording with a steady background sound can read low; if “Your original” shows a pitch near 90 Hz but
+        you don’t have a very deep voice, trust your ears over that row.
+      </p>
     </div>
   );
 }

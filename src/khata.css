@@ -445,3 +445,20 @@ dialog .k-give-get { margin: 4px 0 14px; }
 @media (max-width: 760px) { .k-script li { grid-template-columns: minmax(0, 1fr); } .k-script-late { grid-column: 1; } }
 .k-studio-test { display: grid; gap: 8px; }
 .k-studio-test audio { width: 100%; }
+.k-compare { display: grid; gap: 12px; padding-top: 6px; border-top: 1px solid var(--k-line); }
+.k-compare h3 { margin: 0; font-size: 15px; }
+.k-players { display: grid; gap: 10px; }
+.k-players label { display: grid; gap: 4px; font-weight: 500; font-size: 14px; }
+.k-players audio { width: 100%; }
+.k-table-wrap { overflow-x: auto; }
+.k-compare-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.k-compare-table th, .k-compare-table td { padding: 7px 10px; border-bottom: 1px solid var(--k-line); text-align: left; vertical-align: top; }
+.k-compare-table thead th { color: var(--k-muted); font-weight: 600; }
+.k-compare-table tbody th { font-weight: 600; white-space: nowrap; }
+.k-small { font-size: 12px; }
+.k-studio-tips { padding: 12px 14px; border-radius: 8px; background: #fff7e6; color: #5c3b00; font-size: 14px; }
+.k-studio-tips ul { margin: 6px 0; padding-left: 18px; }
+.k-studio-actions .k-btn[aria-pressed="true"]:not(.k-btn-primary) { border-color: #9a5b00; color: #7a4700; }
+.k-compare-table th, .k-compare-table td { color: var(--k-text) !important; background: transparent !important; font-size: 13px !important; }
+.k-compare-table thead th { color: #3f3f46 !important; }
+.k-table-wrap:focus-visible { outline: 2px solid var(--k-accent); outline-offset: 2px; }

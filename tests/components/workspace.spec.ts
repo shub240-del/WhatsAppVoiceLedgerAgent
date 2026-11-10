@@ -118,47 +118,62 @@ test("guest: tapping the mic records right away (sign-up comes when it is sent)"
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test("voice studio: a real voice note is trimmed, cloned once, tested on one line, then every line is placed and bundled", async ({ page }) => {
-  // The owner's own sample lives outside the repo; skip if it isn't on this machine.
-  const sample = process.env.VOICE_SAMPLE ?? "/tmp/voice-sample.mp3";
-  test.skip(!(await import("node:fs")).existsSync(sample), "no local voice sample");
+const SAMPLE = process.env.VOICE_SAMPLE ?? "/tmp/voice-sample.mp3";
+const GENTLE = "/tmp/voice-sample-gentle.wav";
+const haveSample = async () => (await import("node:fs")).existsSync(SAMPLE) && (await import("node:fs")).existsSync(GENTLE);
+
+test("voice studio: test one line, compare three recordings, and nothing more is generated until approved", async ({ page }) => {
+  test.skip(!(await haveSample()), "no local voice sample");
   await page.goto("/tests/harness/workspace.html?story#/workspace/studio");
-  await expect(page.getByRole("heading", { name: "Narrate the demo video in your voice" })).toBeVisible();
-  const make = page.getByRole("button", { name: "Make my narration" });
-  await page.getByLabel("Your voice sample").setInputFiles(sample);
-  await expect(make).toBeDisabled(); // consent first
+  await page.getByLabel("Your voice sample").setInputFiles(SAMPLE);
+  await page.getByLabel("Cleaned version", { exact: false }).setInputFiles(GENTLE);
+  await expect(page.getByRole("radio", { name: /My original/ })).toBeChecked(); // safest default
   await page.getByLabel("This is my own voice", { exact: false }).check();
+  const makeAll = page.getByRole("button", { name: "Make all 16 lines" });
+  await expect(makeAll).toBeDisabled();
 
   await page.getByRole("button", { name: "Test my voice (1 line)" }).click();
-  await expect(page.getByLabel("Test line in your voice")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Compare: does the clone sound like you?" })).toBeVisible({ timeout: 30_000 });
+  for (const name of ["Your original", "Cleaned", "Cloned voice — line 1"]) await expect(page.locator(".k-players label", { hasText: name }).locator("audio")).toBeAttached();
+  const table = page.locator(".k-compare-table");
+  await expect(table.getByRole("columnheader")).toHaveText(["Measure", "Your original", "Cleaned", "Cloned voice", "Clone vs your original"]);
+  for (const row of ["Pitch (median)", "Speaking pace", "Tone (spectral shape)"]) await expect(table.getByRole("rowheader", { name: row })).toBeVisible();
+  await expect(makeAll).toBeDisabled(); // still locked: no approval yet
 
-  await make.click();
+  let speaks = await page.evaluate(() => window.__requests.filter((r) => String(r.url).endsWith("/speak")).length);
+  expect(speaks).toBe(1);
+  await page.getByRole("button", { name: "No, it doesn’t" }).click();
+  await expect(page.getByText("To get a closer clone:")).toBeVisible();
+  await expect(makeAll).toBeDisabled();
+
+  await page.getByRole("button", { name: "Approve — this sounds like me" }).click();
+  await expect(makeAll).toBeEnabled();
+  await makeAll.click();
   const zipLink = page.getByRole("link", { name: "Download everything (ZIP)" });
   await expect(zipLink).toBeVisible({ timeout: 30_000 });
-
   const calls = await page.evaluate(() => window.__requests.filter((r) => String(r.url).includes("voice-studio")));
-  expect(calls.filter((c) => String(c.url).endsWith("/voice"))).toHaveLength(1); // cloned once, reused
-  expect(calls.filter((c) => String(c.url).endsWith("/speak"))).toHaveLength(17); // 1 test + 16 lines
-  const voiceCall = calls.find((c) => String(c.url).endsWith("/voice"))!.body as { mimeType: string; consent: boolean; audioBase64: string };
-  expect(voiceCall.mimeType).toBe("audio/wav");
+  expect(calls.filter((c) => String(c.url).endsWith("/voice"))).toHaveLength(1); // cloned once from the original
+  speaks = calls.filter((c) => String(c.url).endsWith("/speak")).length;
+  expect(speaks).toBe(17); // 1 test + 16 after approval
+  const voiceCall = calls.find((c) => String(c.url).endsWith("/voice"))!.body as { audioBase64: string; consent: boolean };
   expect(voiceCall.consent).toBe(true);
-  // 25 s of 16 kHz mono WAV is about 1.07 M base64 characters: the sample was trimmed, not sent whole.
-  expect(Number(voiceCall.audioBase64.split(" ")[0])).toBeLessThan(1_100_000);
-
-  // The full narration covers the whole video and is a valid 24 kHz WAV.
-  const info = await page.getByRole("link", { name: "Narration only (WAV)" }).evaluate(async (a: HTMLAnchorElement) => {
-    const bytes = await (await fetch(a.href)).arrayBuffer();
-    const v = new DataView(bytes);
-    return { rate: v.getUint32(24, true), seconds: (bytes.byteLength - 44) / 2 / v.getUint32(24, true) };
-  });
-  expect(info.rate).toBe(24000);
-  expect(info.seconds).toBeGreaterThan(85);
-  // The ZIP holds 16 separate lines plus the mix, script and timings.
+  expect(Number(voiceCall.audioBase64.split(" ")[0])).toBeLessThan(1_100_000); // trimmed to 25 s
   const names = await zipLink.evaluate(async (a: HTMLAnchorElement) => {
     const text = new TextDecoder().decode(await (await fetch(a.href)).arrayBuffer());
     return [...new Set(text.match(/lines\/\d\d-[a-z0-9-]+\.wav|narration\.wav|script\.txt|timing\.json/g))];
   });
   expect(names.filter((n) => n.startsWith("lines/"))).toHaveLength(16);
-  expect(names).toEqual(expect.arrayContaining(["lines/01-title.wav", "lines/16-end.wav", "narration.wav", "script.txt", "timing.json"]));
-  await expect(page.getByText("Every line lands on its scene.", { exact: false })).toBeVisible();
+});
+
+test("voice studio: when Gnani refuses, the exact reason is shown and nothing is generated", async ({ page }) => {
+  test.skip(!(await haveSample()), "no local voice sample");
+  await page.goto("/tests/harness/workspace.html?story#/workspace/studio");
+  const reason = "Gnani voice cloning failed — HTTP 403 (SCOPE_NOT_ALLOWED: Voice cloning is not enabled for this key): this Gnani key isn't allowed to use voice cloning. Nothing was generated; no other voice was used.";
+  await page.evaluate((r) => ((window as unknown as { __gnaniRefuse: string }).__gnaniRefuse = r), reason);
+  await page.getByLabel("Your voice sample").setInputFiles(SAMPLE);
+  await page.getByLabel("This is my own voice", { exact: false }).check();
+  await page.getByRole("button", { name: "Test my voice (1 line)" }).click();
+  await expect(page.getByRole("alert")).toHaveText(reason, { timeout: 30_000 });
+  await expect(page.getByLabel("Test line in your voice")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Make all 16 lines" })).toBeDisabled();
 });

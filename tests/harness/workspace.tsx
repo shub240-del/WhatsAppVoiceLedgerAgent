@@ -31,6 +31,9 @@ window.fetch = (async (url: string, init: RequestInit) => {
   if (!href.includes("/api/")) return nativeFetch(url, init);
   const body = init?.body && typeof init.body === "string" ? JSON.parse(init.body) : null;
   window.__requests.push({ url: href, body: href.includes("voice-studio/voice") ? { ...body, audioBase64: `${body.audioBase64.length} chars` } : body });
+  const refuse = (window as unknown as { __gnaniRefuse?: string }).__gnaniRefuse;
+  if (refuse && href.includes("/api/voice-studio/"))
+    return new Response(JSON.stringify({ error: { code: "GNANI_REJECTED", message: refuse } }), { status: 502, headers: { "Content-Type": "application/json" } });
   if (href.endsWith("/api/voice-studio/voice"))
     return new Response(JSON.stringify({ voice: { embedding: "QUJDREVGR0hJSktMTU5PUA==", shape: [1, 768], dtype: "torch.bfloat16" } }), { status: 200, headers: { "Content-Type": "application/json" } });
   if (href.endsWith("/api/voice-studio/speak")) return new Response(toneWav(), { status: 200, headers: { "Content-Type": "audio/wav" } });

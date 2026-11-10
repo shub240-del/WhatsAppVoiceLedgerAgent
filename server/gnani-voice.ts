@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { ProviderUnavailable, UnusableAudio } from "./agent/errors.js";
+import { ProviderUnavailable } from "./agent/errors.js";
 import type { GnaniSttConfig } from "./gnani-config.js";
-import { GnaniAccountError } from "./gnani-stt.js";
 
 type Fetch = typeof fetch;
 
@@ -22,21 +21,41 @@ export type SpeakerEmbedding = z.infer<typeof speakerEmbedding>;
 
 export const VOICE_SAMPLE_RATE = 24_000;
 
-function fail(status: number, what: string): never {
-  switch (status) {
-    case 401:
-      throw new GnaniAccountError("invalid_key", "Gnani rejected the API key (check GNANI_API_KEY).");
-    case 402:
-      throw new GnaniAccountError("insufficient_credit", "Gnani account has insufficient credit.");
-    case 403:
-      throw new GnaniAccountError("scope_not_allowed", "This Gnani key is not allowed to use voice cloning.");
-    case 400:
-    case 413:
-    case 422:
-      throw new UnusableAudio("unusable");
-    default:
-      throw new ProviderUnavailable("gnani", `Gnani ${what} returned ${status}.`);
+/**
+ * Gnani refused or failed a voice request. Carries Gnani's own status, error code and message so the
+ * owner sees the exact limitation (never the key). There is no fallback to a generic voice.
+ */
+export class GnaniVoiceError extends Error {
+  constructor(public step: "clone" | "speak", public status: number, public gnaniCode: string | null, public gnaniMessage: string | null) {
+    super(GnaniVoiceError.explain(step, status, gnaniCode, gnaniMessage));
+    this.name = "GnaniVoiceError";
   }
+  static explain(step: string, status: number, code: string | null, message: string | null) {
+    const what = step === "clone" ? "voice cloning" : "speaking in the cloned voice";
+    const meaning: Record<number, string> = {
+      400: "Gnani rejected the request (for example, voice cloning or the vachana-vc-v1 model isn't enabled for this key, or the audio isn't usable)",
+      401: "Gnani rejected the API key",
+      402: "the Gnani account has no credit left",
+      403: "this Gnani key isn't allowed to use voice cloning",
+      404: "this Gnani account doesn't have the voice-cloning endpoint",
+      413: "the voice sample is too large for Gnani",
+      422: "Gnani couldn't use the voice sample",
+      429: "Gnani is rate-limiting; wait a minute and try again",
+    };
+    const reason = meaning[status] ?? (status >= 500 ? "Gnani had an internal error" : "Gnani returned an unexpected error");
+    const detail = [code, message].filter(Boolean).join(": ");
+    return `Gnani ${what} failed — HTTP ${status}${detail ? ` (${detail})` : ""}: ${reason}. Nothing was generated; no other voice was used.`;
+  }
+}
+
+async function fail(response: Response, step: "clone" | "speak"): Promise<never> {
+  // Gnani errors come as {"success":false,"message":...} or {"detail":{"error_code":...,"message":...}}.
+  const body = (await response.json().catch(() => null)) as { message?: unknown; detail?: { error_code?: unknown; message?: unknown } | string } | null;
+  const detail = body && typeof body.detail === "object" ? body.detail : null;
+  const code = typeof detail?.error_code === "string" ? detail.error_code.slice(0, 60) : null;
+  const raw = detail?.message ?? body?.message ?? (typeof body?.detail === "string" ? body.detail : null);
+  const message = typeof raw === "string" ? raw.replace(/\s+/g, " ").slice(0, 240) : null;
+  throw new GnaniVoiceError(step, response.status, code, message);
 }
 
 export async function cloneVoice(config: GnaniSttConfig, audio: Uint8Array, mimeType: string, fetchImpl: Fetch = fetch): Promise<SpeakerEmbedding> {
@@ -54,7 +73,7 @@ export async function cloneVoice(config: GnaniSttConfig, audio: Uint8Array, mime
   } catch {
     throw new ProviderUnavailable("gnani", "Could not reach Gnani voice cloning.");
   }
-  if (!response.ok) fail(response.status, "voice cloning");
+  if (!response.ok) await fail(response, "clone");
   const json = (await response.json().catch(() => null)) as { data?: { voice_clone_embedding?: unknown } } | null;
   const parsed = speakerEmbedding.safeParse(json?.data?.voice_clone_embedding);
   if (!parsed.success) throw new ProviderUnavailable("gnani", "Gnani voice cloning returned an unexpected response.");
@@ -78,7 +97,7 @@ export async function speakInVoice(config: GnaniSttConfig, text: string, voice: 
   } catch {
     throw new ProviderUnavailable("gnani", "Could not reach Gnani text-to-speech.");
   }
-  if (!response.ok) fail(response.status, "text-to-speech");
+  if (!response.ok) await fail(response, "speak");
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (bytes.length < 100) throw new ProviderUnavailable("gnani", "Gnani returned empty audio.");
   return bytes;

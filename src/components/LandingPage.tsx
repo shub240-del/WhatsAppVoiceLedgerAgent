@@ -185,7 +185,7 @@ function Demo() {
             <span className="l-dot" aria-hidden="true" />
             Udhaar assistant
           </div>
-          <div className="l-chat" aria-live="polite" ref={chat} tabIndex={0} aria-label="Demo messages">
+          <div className="l-chat" role="region" aria-live="polite" ref={chat} tabIndex={0} aria-label="Demo messages">
             {steps.map((s, i) =>
               s.from === "owner" ? (
                 <p key={i} className="l-msg owner">
@@ -369,7 +369,9 @@ export function LandingPage({ onStart, onLogin }: { onStart(): void; onLogin(): 
       <main id="main-content">
         <section className="l-hero l-wrap">
           <p className="l-kicker">Voice khata for kirana shops</p>
-          <h1>Bolo. Udhaar likh gaya.</h1>
+          <h1>
+            <span className="l-h1-lead">Bolo.</span> Udhaar likh gaya.
+          </h1>
           <p className="l-lead">
             Diary band karo. Say “Ramesh ko 340 ka udhaar” and Udhaar writes it in Ramesh’s khata, with the new
             balance — in your own language.

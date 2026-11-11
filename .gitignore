@@ -33,3 +33,4 @@ playwright-report/
 
 # Local Vercel build output
 .vercel/
+tools/__pycache__/
